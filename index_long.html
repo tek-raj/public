@@ -1,0 +1,2449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Wet Tropics Climate Risk - Interactive Hazard Map</title>
+    <meta property="og:description" content="Interactive map of Wet Tropics with climate hazard data." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- MapLibre GL JS CSS & Script -->
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js'></script>
+
+    <!-- Turf.js: geometry ops for Area-of-Interest clipping -->
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <!-- html2canvas: snapshots the map + overlays (legend, title, north arrow, scale bar) to PNG -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e27;
+        }
+        
+        html, body, #map { 
+            height: 100%; 
+            width: 100%; 
+        }
+
+        /* Title Bar */
+        .title-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            padding: 16px 28px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .title-bar h1 {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+
+        .title-bar p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            font-weight: 400;
+        }
+
+        /* Layer Panel */
+        .layer-panel {
+            position: absolute;
+            top: 90px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 280px;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel-header h2 {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .layer-group {
+            margin-bottom: 20px;
+        }
+
+        .layer-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 4px 0;
+            user-select: none;
+        }
+
+        .layer-group-title {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .collapse-arrow {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .layer-group.collapsed .collapse-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .layer-group-content {
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            max-height: 3000px;
+            opacity: 1;
+        }
+
+        .layer-group.collapsed .layer-group-content {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .layer-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .layer-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .layer-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .layer-name {
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .layer-description {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 10px;
+            margin-top: 2px;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #4f9cf7;
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Opacity Slider */
+        .opacity-control {
+            margin-top: 8px;
+            padding-left: 46px;
+        }
+
+        .opacity-control label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .opacity-slider {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .opacity-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4f9cf7;
+            cursor: pointer;
+        }
+
+        .opacity-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4f9cf7;
+            cursor: pointer;
+            border: none;
+        }
+
+
+        /* Coordinates Display */
+        .coords-display {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .coords-display span {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Custom MapLibre Controls Styling */
+        .maplibregl-ctrl {
+            border-radius: 12px !important;
+            overflow: hidden;
+        }
+
+        .maplibregl-ctrl svg {
+            fill: #ffffff !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .title-bar {
+                top: 10px;
+                padding: 12px 20px;
+            }
+            
+            .title-bar h1 {
+                font-size: 16px;
+            }
+            
+            .layer-panel {
+                display: none;
+            }
+        }
+
+        /* Scrollbar styling */
+        .layer-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .layer-panel::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .layer-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .layer-panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Legend Styling */
+        .legend-container {
+            margin-top: 10px;
+            padding-left: 46px;
+            display: none;
+        }
+
+        .legend-container.visible {
+            display: block;
+        }
+
+        .legend-bar-wrapper {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .legend-gradient {
+            width: 20px;
+            height: 120px;
+            border-radius: 4px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .legend-labels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 120px;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .legend-label {
+            white-space: nowrap;
+        }
+
+        /* Legend gradients for each layer */
+        .legend-cyclone {
+            background: linear-gradient(to bottom,
+                #4c1d95 0%,   /* dark purple - highest probability */
+                #7c3aed 25%,
+                #a78bfa 50%,
+                #ddd6fe 75%,
+                #f5f3ff 100%  /* near-white - lowest */
+            );
+        }
+
+        .legend-canopy {
+            background: linear-gradient(to bottom,
+                #14532d 0%,   /* dark green - tallest canopy */
+                #22c55e 40%,
+                #86efac 70%,
+                #f0fdf4 100%  /* pale - shortest/no canopy */
+            );
+        }
+
+        .legend-temperature {
+            background: linear-gradient(to bottom, 
+                #e31a1c 0%,
+#fd8d3c 25%,
+#feb24c 50%,
+#ffeda0 75%,
+#ffffcc 100%  /* very light pink/white - zero */
+            );
+        }
+
+        .legend-hotdays {
+            background: linear-gradient(to bottom, 
+                #e31a1c 0%,
+#fd8d3c 25%,
+#feb24c 50%,
+#ffeda0 75%,
+#ffffcc 100%   
+            );
+        }
+
+        .legend-firedanger {
+            background: linear-gradient(to bottom, 
+                #431407 0%,    
+                #ea580c 25%,   
+                #fb923c 50%,   
+                #fecaca 75%,   
+                #fef2f2 100%   
+            );
+        }
+
+        .legend-drought {
+            background: linear-gradient(to bottom, 
+                #4E162A 0%,    
+                #ef4444 50%,   
+                #fef2f2 100%   
+            );
+        }
+
+        .legend-rainfall {
+            background: linear-gradient(to bottom, 
+                #08519c 0%,
+#3182bd 20%,
+#6baed6 40%,
+#9ecae1 60%,
+#c6dbef 80%,
+#f7fbff 100%   
+            );
+        }
+
+        .legend-inundation {
+            background: linear-gradient(to bottom,
+                #082f49 0%,   /* dark navy - deepest/most frequent inundation */
+                #0369a1 30%,
+                #38bdf8 60%,
+                #bae6fd 85%,
+                #f0f9ff 100%  /* pale - no inundation */
+            );
+        }
+
+        .legend-toggle-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .legend-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Inline opacity control styling */
+        .opacity-control-inline {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .opacity-control-inline .opacity-slider {
+            width: 100px;
+            height: 4px;
+        }
+
+        /* Discrete class-legend swatches (for categorical layers) */
+        .legend-swatch-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .legend-swatch-box {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* ==================== AOI / Export Tools Panel ==================== */
+        .tools-panel {
+            position: absolute;
+            top: 90px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 260px;
+        }
+
+        .tools-section {
+            margin-bottom: 16px;
+        }
+
+        .tools-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .tools-section-title {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .tools-field-label {
+            display: block;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .tools-panel input[type="text"],
+        .tools-panel input[type="file"],
+        .tools-panel select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: #ffffff;
+            font-size: 12px;
+            font-family: inherit;
+        }
+
+        .tools-panel select option {
+            background: #1e293b;
+            color: #ffffff;
+        }
+
+        .tools-panel input[type="file"] {
+            padding: 6px;
+        }
+
+        .tools-checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+        }
+
+        .tools-inline-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+            margin-bottom: 6px;
+        }
+
+        .tools-panel input[type="color"] {
+            width: 36px;
+            height: 26px;
+            padding: 0;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .tools-range-value {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            min-width: 32px;
+            text-align: right;
+        }
+
+        .tools-btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: background 0.2s ease;
+        }
+
+        .tools-btn-primary {
+            background: #4f9cf7;
+            color: #ffffff;
+        }
+
+        .tools-btn-primary:hover {
+            background: #3a8ae8;
+        }
+
+        .tools-btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .tools-btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .aoi-status {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 6px;
+        }
+
+        .aoi-status.aoi-active {
+            color: #6fd08c;
+        }
+
+        /* North arrow (shown only while exporting). Has its own opaque badge
+           background - the map underneath can be light or dark at any corner,
+           so the arrow can't rely on the basemap for contrast. */
+        .north-arrow {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            z-index: 10;
+            width: 112px;
+            height: 152px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 14px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        }
+
+        .north-arrow.visible {
+            display: flex;
+        }
+
+        /* Legend + scale bar share one bottom-left stack, legend directly
+           above the scale bar - the conventional map-layout position. */
+        .export-bottom-left-stack {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            z-index: 9;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 14px;
+        }
+
+        /* Export-only scale bar (custom-drawn, shown only while exporting) */
+        .export-scalebar {
+            display: none;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 10px;
+            padding: 12px 18px 16px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        }
+
+        .export-scalebar.visible {
+            display: block;
+        }
+
+        .export-scalebar-label {
+            color: #ffffff;
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .export-scalebar-bar {
+            height: 22px;
+            border: 3px solid #ffffff;
+            border-radius: 3px;
+            background:
+                linear-gradient(to right, #ffffff 0 50%, #111827 50% 100%);
+        }
+
+        /* Export-only legend (clean swatches, no toggles/sliders) */
+        .export-legend {
+            display: none;
+            max-width: 340px;
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 16px 20px;
+        }
+
+        .export-legend.visible {
+            display: block;
+        }
+
+        .export-legend-item {
+            margin-bottom: 14px;
+        }
+
+        .export-legend-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .export-legend-item-title {
+            color: #ffffff;
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .export-legend .legend-label,
+        .export-legend .legend-swatch-row span {
+            font-size: 16px !important;
+        }
+
+        .export-legend .legend-swatch-row {
+            gap: 10px !important;
+            margin-bottom: 6px !important;
+        }
+
+        .export-legend .legend-swatch-box {
+            width: 20px !important;
+            height: 20px !important;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Title Bar -->
+<div class="title-bar">
+    <h1>Wet Tropics Climate Risk</h1>
+    <p>Interactive Hazard &amp; Landscape Map</p>
+</div>
+
+<!-- AOI Clip & Export Tools Panel -->
+<div class="tools-panel">
+    <div class="panel-header">
+        <h2>🧭 Map Tools</h2>
+    </div>
+
+    <div class="tools-section">
+        <div class="tools-section-title">Area of Interest</div>
+        <label class="tools-field-label" for="aoi-file-input">Upload boundary (GeoJSON)</label>
+        <input type="file" id="aoi-file-input" accept=".geojson,.json,application/geo+json,application/json">
+
+        <div class="tools-inline-row">
+            <label class="tools-field-label" for="aoi-color" style="margin-bottom: 0;">Boundary colour</label>
+            <input type="color" id="aoi-color" value="#ffcc00">
+        </div>
+
+        <label class="tools-field-label" for="aoi-mask-opacity">Dim area outside AOI</label>
+        <div class="tools-inline-row">
+            <input type="range" id="aoi-mask-opacity" min="0" max="100" value="45" style="flex: 1;">
+            <span class="tools-range-value" id="aoi-mask-opacity-value">45%</span>
+        </div>
+
+        <div class="aoi-status" id="aoi-status">No AOI loaded — full extent shown</div>
+        <button class="tools-btn tools-btn-secondary" id="aoi-clear-btn">Clear AOI</button>
+    </div>
+
+    <div class="tools-section">
+        <div class="tools-section-title">Export Map</div>
+        <label class="tools-field-label" for="export-title-input">Map title (optional)</label>
+        <input type="text" id="export-title-input" placeholder="e.g. Cyclone Wind Speed - Wet Tropics">
+
+        <div class="tools-checkbox-row" style="margin-top: 12px;">
+            <input type="checkbox" id="export-north-arrow" checked>
+            <label for="export-north-arrow">North arrow</label>
+        </div>
+        <div class="tools-checkbox-row">
+            <input type="checkbox" id="export-scale-bar" checked>
+            <label for="export-scale-bar">Scale bar</label>
+        </div>
+        <div class="tools-checkbox-row">
+            <input type="checkbox" id="export-legend-check" checked>
+            <label for="export-legend-check">Legend (active layers)</label>
+        </div>
+
+        <label class="tools-field-label" for="export-orientation" style="margin-top: 4px;">Output size</label>
+        <select id="export-orientation">
+            <option value="screen">Match current window</option>
+            <option value="landscape">Landscape (report, A4-ish)</option>
+            <option value="portrait">Portrait (report, A4-ish)</option>
+        </select>
+
+        <button class="tools-btn tools-btn-primary" id="export-map-btn">📷 Export as PNG</button>
+    </div>
+</div>
+
+<!-- North arrow overlay (shown only during export capture) -->
+<div class="north-arrow" id="north-arrow">
+    <svg width="68" height="112" viewBox="0 0 68 112" xmlns="http://www.w3.org/2000/svg">
+        <text x="34" y="28" text-anchor="middle" font-size="30" font-weight="700"
+              font-family="Inter, sans-serif" fill="#ffffff">N</text>
+        <polygon points="34,36 54,96 34,80" fill="#ffffff"/>
+        <polygon points="34,36 14,96 34,80" fill="#9ca3af"/>
+    </svg>
+</div>
+
+<!-- Legend + scale bar, stacked bottom-left (legend directly above the bar) -->
+<div class="export-bottom-left-stack" id="export-bottom-left-stack">
+    <!-- Export-only legend (clean swatches for the currently active layers) -->
+    <div class="export-legend" id="export-legend"></div>
+    <!-- Export-only scale bar (custom-drawn, shown only during export capture) -->
+    <div class="export-scalebar" id="export-scalebar"></div>
+</div>
+
+<!-- Layer Control Panel -->
+<div class="layer-panel">
+    <div class="panel-header">
+        <h2>🗂️ Layers</h2>
+    </div>
+
+    <!-- Base Maps -->
+    <div class="layer-group" id="base-map-group">
+        <div class="layer-group-header" onclick="toggleGroup('base-map-group')">
+            <span class="layer-group-title">Base Map</span>
+            <span class="collapse-arrow">▼</span>
+        </div>
+        <div class="layer-group-content">
+        
+        <div class="layer-item">
+            <div class="layer-info">
+                <span class="layer-name">Satellite</span>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="satellite-toggle" checked>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <div class="layer-item">
+            <div class="layer-info">
+                <span class="layer-name">Street Map</span>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="street-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <div class="layer-item">
+            <div class="layer-info">
+                <span class="layer-name"> Hillshade </span>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="hillshade-toggle" checked>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        </div>
+    </div>
+
+    <!-- Climate Hazard Overlays -->
+    <div class="layer-group" id="climate-hazards-group">
+        <div class="layer-group-header" onclick="toggleGroup('climate-hazards-group')">
+            <span class="layer-group-title">Climate &amp; Landscape Layers</span>
+            <span class="collapse-arrow">▼</span>
+        </div>
+        <div class="layer-group-content">
+
+        <!-- Tropical Cyclone -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Cyclone Wind Speed (100-Year Return Period) </span>
+                    <span class="layer-description">Wind speed (km/h) </span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="cyclone-toggle" checked>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('cyclone-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="cyclone-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="cyclone-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container visible" id="cyclone-legend">
+            <div id="cyclone-legend-content" style="font-size: 10px; color: rgba(255,255,255,0.6);">Loading legend...</div>
+        </div>
+
+        <!-- Canopy Height -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Canopy Height</span>
+                    <span class="layer-description">GEDI / ETH height (m)</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="canopy-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('canopy-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="canopy-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="canopy-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="canopy-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-canopy"></div>
+                <div class="legend-labels">
+                    <span class="legend-label">49</span>
+                    <span class="legend-label">0</span>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Forest Maturity -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Relative Forest Maturity</span>
+                    <span class="layer-description">Forest maturity index (young ( class 3) - mature (class 12))</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="forestmat-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('forestmat-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="forestmat-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="forestmat-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="forestmat-legend">
+            <div id="forestmat-legend-content" style="font-size: 10px; color: rgba(255,255,255,0.6);">Loading legend...</div>
+        </div>
+
+        <!-- Max Temperature Change -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Max Temp Change</span>
+                    <span class="layer-description">Annual max temp change (°C)</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="maxtemp-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('maxtemp-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="maxtemp-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="maxtemp-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="maxtemp-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-temperature"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="maxtemp-legend-max">3.1</span>
+                    <span class="legend-label" id="maxtemp-legend-min">2.3</span>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Projected Absolute Maximum Temperature -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Projected Absolute Maximum Temperature</span>
+                    <span class="layer-description">Absolute Maximum Temperature ssp370 2090 (°C)</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="Absmaxtemp-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('Absmaxtemp-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="Absmaxtemp-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="Absmaxtemp-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="Absmaxtemp-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-temperature"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="Absmaxtemp-legend-max">32.3</span>
+                    <span class="legend-label" id="Absmaxtemp-legend-min">26</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projected Absolute Minimum Temperature -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Projected Absolute Minimum Temperature</span>
+                    <span class="layer-description">Absolute Minimum Temperature ssp370 2090 (°C)</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="Absmintemp-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('Absmintemp-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="Absmintemp-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="Absmintemp-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="Absmintemp-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-temperature"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="Absmintemp-legend-max">25</span>
+                    <span class="legend-label" id="Absmintemp-legend-min">17.5</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projected Absolute Mean Temperature -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Projected Absolute Mean Temperature</span>
+                    <span class="layer-description">Absolute Mean Temperature ssp370 2090 (°C)</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="Absmeantemp-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('Absmeantemp-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="Absmeantemp-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="Absmeantemp-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="Absmeantemp-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-temperature"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="Absmeantemp-legend-max">28.3</span>
+                    <span class="legend-label" id="Absmeantemp-legend-min">21.8</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hot Days Change -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Hot Days Change</span>
+                    <span class="layer-description">Change in number of hot days</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="hotdays-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('hotdays-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="hotdays-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="hotdays-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="hotdays-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-hotdays"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="hotdays-legend-max">114</span>
+                    <span class="legend-label" id="hotdays-legend-min">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hot Nights Change -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Hot Nights Change</span>
+                    <span class="layer-description">Change in number of hot nights</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="hotnights-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('hotnights-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="hotnights-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="hotnights-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="hotnights-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-hotdays"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="hotnights-legend-max">135</span>
+                    <span class="legend-label" id="hotnights-legend-min">53</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatwave Duration Change -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Heatwave Duration Change</span>
+                    <span class="layer-description">Change in heatwave duration (days)</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="heatwave-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('heatwave-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="heatwave-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="heatwave-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="heatwave-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-firedanger"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="heatwave-legend-max">41</span>
+                    <span class="legend-label" id="heatwave-legend-min">15</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Severe Drought Time Change -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Severe Drought Time</span>
+                    <span class="layer-description">change in percent time in severe drought (%), </span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="drought-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('drought-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="drought-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="drought-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="drought-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-drought"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="drought-legend-max">27</span>
+                    <span class="legend-label" id="drought-legend-min">3</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Extremely Wet Days Change -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Extremely Wet Days Change</span>
+                    <span class="layer-description">Change in extremely wet days precipitation (mm)</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="wetdays-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('wetdays-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="wetdays-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="wetdays-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="wetdays-legend">
+            <div class="legend-bar-wrapper">
+                <div class="legend-gradient legend-rainfall"></div>
+                <div class="legend-labels">
+                    <span class="legend-label" id="wetdays-legend-max">18</span>
+                    <span class="legend-label">0</span>
+                    <span class="legend-label" id="wetdays-legend-min">-108</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coastal Inundation (SLR, high tide) -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Coastal Inundation (SLR)</span>
+                    <span class="layer-description">Inundation during high tide</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="inundation-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('inundation-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="inundation-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="inundation-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="inundation-legend">
+            <div id="inundation-legend-content" style="font-size: 10px; color: rgba(255,255,255,0.6);">Loading legend...</div>
+        </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- Coordinates Display -->
+<div class="coords-display">
+    <span id="coordinates">Lat: -17.00° | Lng: 145.70°</span>
+</div>
+
+<script>
+    // Initialize map with GLOBE projection
+    const map = new maplibregl.Map({
+        container: 'map',
+        
+        // Wet Tropics QLD center (approx Cairns / Atherton Tablelands area)
+        center: [145.70, -17.00], 
+        zoom: 8, 
+        
+        pitch: 30, // Keep the 3D perspective
+        hash: true,
+        
+        style: {
+            "version": 8,
+            'projection': {
+                'type': 'globe'
+            },
+
+            "sources": {
+                // Satellite imagery (Google)
+                satellite: {
+                    type: 'raster',
+                    tiles: ['https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'],
+                    tileSize: 256,
+                    attribution: '&copy; Google Earth',
+                    maxzoom: 20
+                },
+                
+                // Street map (OpenStreetMap)
+                street: {
+                    type: 'raster',
+                    tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    attribution: '&copy; OpenStreetMap Contributors',
+                    maxzoom: 19
+                },
+                
+                // Terrain DEM for 3D effect
+                terrainSource: {
+                    type: 'raster-dem',
+                    url: 'https://tiles.mapterhorn.com/tilejson.json'
+                },
+                
+                // Hillshade source
+                hillshadeSource: {
+                    type: 'raster-dem',
+                    url: 'https://tiles.mapterhorn.com/tilejson.json'
+                },
+
+                // Study area boundary (for reference outline)
+                studyBoundary: {
+                    type: 'geojson',
+                    data: './wet_tropics_boundary.geojson'
+                },
+
+                // ===== Climate & landscape data tiles =====
+
+                cycloneData: {
+                    type: 'raster',
+                    tiles: ['./100_year_return_probablity_of_tropical_cyclone_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                canopyData: {
+                    type: 'raster',
+                    tiles: ['./Canopy_height_GEDI_ETH_LANG_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'GEDI / ETH Canopy Height'
+                },
+
+                forestMaturityData: {
+                    type: 'raster',
+                    tiles: ['./Forest_maturity_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Forest Maturity Index'
+                },
+
+                maxTempData: {
+                    type: 'raster',
+                    tiles: ['./Change_in_mean_annual_max_temperature_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                AbsmaxTempData: {
+                    type: 'raster',
+                    tiles: ['./Projected_absolute_maximum_temperature_ssp370_2090_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                AbsminTempData: {
+                    type: 'raster',
+                    tiles: ['./Projected_absolute_minimum_temperature_ssp370_2090_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                AbsmeanTempData: {
+                    type: 'raster',
+                    tiles: ['./Projected_absolute_mean_temperature_ssp370_2090_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+		hotDaysData: {
+                    type: 'raster',
+                    tiles: ['./Change_in_number_of_hot_days_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                hotNightsData: {
+                    type: 'raster',
+                    tiles: ['./Change_in_number_of_hot_nights_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                heatwaveData: {
+                    type: 'raster',
+                    tiles: ['./Change_in_duration_of_heatwaves_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                droughtData: {
+                    type: 'raster',
+                    tiles: ['./Change_in_percent_time_in_severe_drought_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                wetDaysData: {
+                    type: 'raster',
+                    tiles: ['./change_in_extremely_wet_days_precipitation_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Wet Tropics Climate Risk Data'
+                },
+
+                inundationData: {
+                    type: 'raster',
+                    tiles: ['./Inundation_by_SLR_during_high_tide_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Sea Level Rise Inundation Modelling'
+                }
+            },
+            layers: [
+                // Base map layers (Satellite by default)
+                {
+                    id: 'satellite-layer',
+                    type: 'raster',
+                    source: 'satellite'
+                },
+                {
+                    id: 'street-layer',
+                    type: 'raster',
+                    source: 'street',
+                    layout: { visibility: 'none' }
+                },
+                
+                // Hillshade layer for 3D terrain effect
+                {
+                    id: 'hills',
+                    type: 'hillshade',
+                    source: 'hillshadeSource',
+                    paint: {'hillshade-shadow-color': '#473B24'}
+                },
+
+                // ===== Climate & landscape overlays =====
+                {
+                    id: 'cyclone-layer',
+                    type: 'raster',
+                    source: 'cycloneData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 }
+                },
+                {
+                    id: 'canopy-layer',
+                    type: 'raster',
+                    source: 'canopyData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'forestmat-layer',
+                    type: 'raster',
+                    source: 'forestMaturityData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'maxtemp-layer',
+                    type: 'raster',
+                    source: 'maxTempData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'Absmaxtemp-layer',
+                    type: 'raster',
+                    source: 'AbsmaxTempData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'Absmintemp-layer',
+                    type: 'raster',
+                    source: 'AbsminTempData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'Absmeantemp-layer',
+                    type: 'raster',
+                    source: 'AbsmeanTempData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+		{
+                    id: 'hotdays-layer',
+                    type: 'raster',
+                    source: 'hotDaysData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'hotnights-layer',
+                    type: 'raster',
+                    source: 'hotNightsData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'heatwave-layer',
+                    type: 'raster',
+                    source: 'heatwaveData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'drought-layer',
+                    type: 'raster',
+                    source: 'droughtData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'wetdays-layer',
+                    type: 'raster',
+                    source: 'wetDaysData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'inundation-layer',
+                    type: 'raster',
+                    source: 'inundationData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+
+                // Study area boundary outline (always on top of raster overlays)
+                {
+                    id: 'boundary-outline',
+                    type: 'line',
+                    source: 'studyBoundary',
+                    paint: {
+                        'line-color': '#ffffff',
+                        'line-width': 2,
+                        'line-dasharray': [2, 1]
+                    }
+                }
+            ],
+            
+            // 3D Terrain configuration
+            terrain: {
+                source: 'terrainSource',
+                exaggeration: 1
+            },
+            
+            sky: {}
+        },
+        maxZoom: 18,
+        maxPitch: 85
+    });
+
+    // Add scale control (below zoom panel)
+    map.addControl(
+        new maplibregl.ScaleControl({
+            maxWidth: 200,
+            unit: 'metric'
+        }),
+        'bottom-left'
+    );
+
+    // Add navigation controls (zoom)
+    map.addControl(
+        new maplibregl.NavigationControl({
+            visualizePitch: true,
+            showZoom: true,
+            showCompass: true,
+            showRotation: true
+        }),
+        'bottom-left'
+    );
+
+    // Wait for map to load
+    map.on('load', () => {
+        console.log('🌍 Map loaded with all climate & landscape layers!');
+    });
+
+    // Update coordinates display on mouse move
+    map.on('mousemove', (e) => {
+        const coords = e.lngLat;
+        document.getElementById('coordinates').textContent = 
+            `Lat: ${coords.lat.toFixed(4)}° | Lng: ${coords.lng.toFixed(4)}°`;
+    });
+
+    // ==================== GROUP COLLAPSE FUNCTION ====================
+    
+    function toggleGroup(groupId) {
+        const group = document.getElementById(groupId);
+        if (group) {
+            group.classList.toggle('collapsed');
+        }
+    }
+
+    // ==================== LEGEND TOGGLE FUNCTION ====================
+    
+    function toggleLegend(legendId) {
+        const legend = document.getElementById(legendId);
+        if (legend) {
+            legend.classList.toggle('visible');
+        }
+    }
+
+    // ==================== BASE MAP CONTROLS ====================
+    
+    // Satellite toggle
+    document.getElementById('satellite-toggle').addEventListener('change', (e) => {
+        map.setLayoutProperty('satellite-layer', 'visibility', e.target.checked ? 'visible' : 'none');
+        if (e.target.checked) {
+            document.getElementById('street-toggle').checked = false;
+            map.setLayoutProperty('street-layer', 'visibility', 'none');
+        }
+    });
+
+    // Street toggle
+    document.getElementById('street-toggle').addEventListener('change', (e) => {
+        map.setLayoutProperty('street-layer', 'visibility', e.target.checked ? 'visible' : 'none');
+        if (e.target.checked) {
+            document.getElementById('satellite-toggle').checked = false;
+            map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+        }
+    });
+
+    // Hillshade toggle (3D Terrain)
+    document.getElementById('hillshade-toggle').addEventListener('change', (e) => {
+        map.setLayoutProperty('hills', 'visibility', e.target.checked ? 'visible' : 'none');
+    });
+
+    // ==================== CLIMATE / LANDSCAPE LAYER CONTROLS ====================
+    // Reusable helper: wires up a toggle + opacity slider + legend for one layer
+    function wireLayer(key, layerId) {
+        const toggle = document.getElementById(`${key}-toggle`);
+        const legend = document.getElementById(`${key}-legend`);
+        const opacitySlider = document.getElementById(`${key}-opacity`);
+        const opacityValue = document.getElementById(`${key}-opacity-value`);
+
+        toggle.addEventListener('change', (e) => {
+            map.setLayoutProperty(layerId, 'visibility', e.target.checked ? 'visible' : 'none');
+            if (e.target.checked) {
+                legend.classList.add('visible');
+            } else {
+                legend.classList.remove('visible');
+            }
+        });
+
+        opacitySlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            map.setPaintProperty(layerId, 'raster-opacity', value / 100);
+            opacityValue.textContent = `${value}%`;
+        });
+    }
+
+    wireLayer('cyclone', 'cyclone-layer');
+    wireLayer('canopy', 'canopy-layer');
+    wireLayer('forestmat', 'forestmat-layer');
+    wireLayer('maxtemp', 'maxtemp-layer');
+    wireLayer('Absmaxtemp', 'Absmaxtemp-layer');
+    wireLayer('Absmintemp', 'Absmintemp-layer');
+    wireLayer('Absmeantemp', 'Absmeantemp-layer');
+    wireLayer('hotdays', 'hotdays-layer');
+    wireLayer('hotnights', 'hotnights-layer');
+    wireLayer('heatwave', 'heatwave-layer');
+    wireLayer('drought', 'drought-layer');
+    wireLayer('wetdays', 'wetdays-layer');
+    wireLayer('inundation', 'inundation-layer');
+
+    // ==================== DISCRETE CLASS LEGENDS (categorical layers) ====================
+    // Reads the companion "<folder>_classes.json" file the tiling script generates
+    // and renders one colored swatch + label per class, instead of a fake gradient.
+    // presentValues: optional Set of numeric class values - when given, only those
+    // classes are rendered (used to show "which classes actually occur in the AOI").
+    async function loadCategoricalLegend(key, jsonUrl, presentValues) {
+        const container = document.getElementById(`${key}-legend-content`);
+        try {
+            const res = await fetch(jsonUrl);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            let classes = await res.json();
+            if (presentValues) {
+                classes = classes.filter(c => presentValues.has(Math.round(c.value)));
+            }
+            container.innerHTML = '';
+            if (classes.length === 0) {
+                container.textContent = 'No classes present in this AOI';
+                return;
+            }
+            classes.forEach(c => {
+                const row = document.createElement('div');
+                row.className = 'legend-swatch-row';
+                row.innerHTML = `<span class="legend-swatch-box" style="background:${c.color}"></span><span>${c.label}</span>`;
+                container.appendChild(row);
+            });
+        } catch (err) {
+            console.warn(`Could not load class legend for ${key}:`, err);
+            container.textContent = 'Legend unavailable';
+        }
+    }
+
+    loadCategoricalLegend('cyclone', './100_year_return_probablity_of_tropical_cyclone_3857_classes.json');
+    loadCategoricalLegend('forestmat', './Forest_maturity_3857_classes.json');
+    loadCategoricalLegend('inundation', './Inundation_by_SLR_during_high_tide_3857_classes.json');
+
+    // ==================== AREA OF INTEREST (AOI) CLIPPING ====================
+    // Uploads a GeoJSON boundary, masks everything outside it, and outlines it.
+    // Uses Turf.js since MapLibre has no native raster-clip-to-polygon feature.
+
+    let aoiPolygon = null;
+
+    function extractPolygon(geojson) {
+        let features;
+        if (geojson.type === 'FeatureCollection') {
+            features = geojson.features.filter(f => f.geometry &&
+                (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
+        } else if (geojson.type === 'Feature' && geojson.geometry &&
+            (geojson.geometry.type === 'Polygon' || geojson.geometry.type === 'MultiPolygon')) {
+            features = [geojson];
+        } else if (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon') {
+            features = [turf.feature(geojson)];
+        } else {
+            features = [];
+        }
+        if (features.length === 0) return null;
+        let merged = features[0];
+        for (let i = 1; i < features.length; i++) {
+            merged = turf.union(merged, features[i]);
+        }
+        return merged;
+    }
+
+    function setAOIStatus(text, active) {
+        const status = document.getElementById('aoi-status');
+        status.textContent = text;
+        status.classList.toggle('aoi-active', !!active);
+    }
+
+    function applyAOI(polygon) {
+        aoiPolygon = polygon;
+
+        const outlineColor = document.getElementById('aoi-color').value;
+        const maskOpacity = document.getElementById('aoi-mask-opacity').value / 100;
+
+        const masked = turf.mask(polygon);
+        if (map.getSource('aoi-mask-source')) {
+            map.getSource('aoi-mask-source').setData(masked);
+        } else {
+            map.addSource('aoi-mask-source', { type: 'geojson', data: masked });
+            map.addLayer({
+                id: 'aoi-mask-layer',
+                type: 'fill',
+                source: 'aoi-mask-source',
+                paint: { 'fill-color': '#0a0e27', 'fill-opacity': maskOpacity }
+            }, 'boundary-outline');
+        }
+
+        if (map.getSource('aoi-outline-source')) {
+            map.getSource('aoi-outline-source').setData(polygon);
+        } else {
+            map.addSource('aoi-outline-source', { type: 'geojson', data: polygon });
+            map.addLayer({
+                id: 'aoi-outline-layer',
+                type: 'line',
+                source: 'aoi-outline-source',
+                paint: { 'line-color': outlineColor, 'line-width': 2 }
+            });
+        }
+
+        map.fitBounds(turf.bbox(polygon), { padding: 60, duration: 800 });
+    }
+
+    document.getElementById('aoi-color').addEventListener('input', (e) => {
+        if (map.getLayer('aoi-outline-layer')) {
+            map.setPaintProperty('aoi-outline-layer', 'line-color', e.target.value);
+        }
+    });
+
+    document.getElementById('aoi-mask-opacity').addEventListener('input', (e) => {
+        document.getElementById('aoi-mask-opacity-value').textContent = `${e.target.value}%`;
+        if (map.getLayer('aoi-mask-layer')) {
+            map.setPaintProperty('aoi-mask-layer', 'fill-opacity', e.target.value / 100);
+        }
+    });
+
+    function clearAOI() {
+        if (map.getLayer('aoi-mask-layer')) map.removeLayer('aoi-mask-layer');
+        if (map.getSource('aoi-mask-source')) map.removeSource('aoi-mask-source');
+        if (map.getLayer('aoi-outline-layer')) map.removeLayer('aoi-outline-layer');
+        if (map.getSource('aoi-outline-source')) map.removeSource('aoi-outline-source');
+        aoiPolygon = null;
+        document.getElementById('aoi-file-input').value = '';
+        resetAOILegendRanges();
+        setAOIStatus('No AOI loaded — full extent shown', false);
+    }
+
+    // ==================== AOI-CLIPPED LEGEND RANGES ====================
+    // The legend's numbers are the original full-dataset range, baked into this
+    // page's HTML when the tiles were generated. This reads the small underlying
+    // source rasters (not the pre-colored tiles, which have no numeric values left)
+    // and recomputes the true min/max - or, for categorical layers, which classes
+    // actually occur - within the uploaded AOI. Canopy Height is excluded: its
+    // source raster is ~450MB, too large to fetch into the browser for this.
+    // forestmat.tif (BigTIFF) and inundation.tif (a 126-million-pixel tiled/
+    // compressed raster) don't fit the minimal reader below, so - like Canopy
+    // Height - they keep their static/unfiltered legend rather than live AOI stats.
+    // Served with a .dat extension rather than .tif - download managers like IDM
+    // hook the browser and intercept requests for recognizable binary file types,
+    // silently stealing the fetch (the page gets an empty response) to add to their
+    // own download queue instead. A generic extension isn't pattern-matched.
+    const RASTER_LAYERS = {
+        maxtemp: { type: 'continuous', url: './source_rasters/maxtemp.dat' },
+        Absmaxtemp: { type: 'continuous', url: './source_rasters/Absmaxtemp.dat' },
+        Absmintemp: { type: 'continuous', url: './source_rasters/Absmintemp.dat' },
+        Absmeantemp: { type: 'continuous', url: './source_rasters/Absmeantemp.dat' },
+        hotdays: { type: 'continuous', url: './source_rasters/hotdays.dat' },
+        hotnights: { type: 'continuous', url: './source_rasters/hotnights.dat' },
+        heatwave: { type: 'continuous', url: './source_rasters/heatwave.dat' },
+        drought: { type: 'continuous', url: './source_rasters/drought.dat' },
+        wetdays: { type: 'continuous', url: './source_rasters/wetdays.dat' },
+        cyclone: { type: 'categorical', url: './source_rasters/cyclone.dat', classesUrl: './100_year_return_probablity_of_tropical_cyclone_3857_classes.json' }
+    };
+
+    const rasterStatsCache = new Map(); // key -> parsed raster, memoized across AOI changes
+    const originalLegendText = new Map(); // element id -> original text, to restore on Clear AOI
+
+    // A minimal single-purpose TIFF reader for these specific source rasters, which
+    // are all classic (non-Big) TIFF, uncompressed, single-band, single-or-multi-strip.
+    // A general-purpose library (geotiff.js) was tried first but threw "Offset is
+    // outside the bounds of the DataView" on every one of these files in this
+    // environment; rather than chase that further, this reader only has to handle
+    // the one well-understood layout GDAL actually produced here.
+    function parseSimpleTiff(buffer) {
+        const view = new DataView(buffer);
+        const little = view.getUint16(0, false) === 0x4949;
+        const magic = view.getUint16(2, little);
+        if (magic !== 42) throw new Error('Not a classic (non-Big) TIFF');
+
+        const TYPE_SIZES = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8 };
+        const ifdOffset = view.getUint32(4, little);
+        const entryCount = view.getUint16(ifdOffset, little);
+        const tags = {};
+        let pos = ifdOffset + 2;
+        for (let i = 0; i < entryCount; i++) {
+            const tag = view.getUint16(pos, little);
+            const type = view.getUint16(pos + 2, little);
+            const count = view.getUint32(pos + 4, little);
+            const typeSize = TYPE_SIZES[type] || 1;
+            const totalSize = typeSize * count;
+            const valueOffset = totalSize > 4 ? view.getUint32(pos + 8, little) : pos + 8;
+
+            if (type === 2) { // ASCII
+                let str = '';
+                for (let k = 0; k < count; k++) str += String.fromCharCode(view.getUint8(valueOffset + k));
+                tags[tag] = str.replace(/\0+$/, '');
+            } else {
+                const vals = [];
+                for (let k = 0; k < count; k++) {
+                    const off = valueOffset + k * typeSize;
+                    switch (type) {
+                        case 1: case 7: vals.push(view.getUint8(off)); break;
+                        case 3: vals.push(view.getUint16(off, little)); break;
+                        case 4: vals.push(view.getUint32(off, little)); break;
+                        case 11: vals.push(view.getFloat32(off, little)); break;
+                        case 12: vals.push(view.getFloat64(off, little)); break;
+                        default: vals.push(null);
+                    }
+                }
+                tags[tag] = vals;
+            }
+            pos += 12;
+        }
+
+        const width = tags[256][0];
+        const height = tags[257][0];
+        const bitsPerSample = tags[258][0];
+        const compression = tags[259] ? tags[259][0] : 1;
+        const sampleFormat = tags[339] ? tags[339][0] : 1;
+        if (compression !== 1) throw new Error(`Unsupported compression (${compression})`);
+
+        const bytesPerSample = bitsPerSample / 8;
+        let data;
+        if (bitsPerSample === 32 && sampleFormat === 3) data = new Float32Array(width * height);
+        else if (bitsPerSample === 16) data = new Uint16Array(width * height);
+        else if (bitsPerSample === 8) data = new Uint8Array(width * height);
+        else throw new Error(`Unsupported sample layout: ${bitsPerSample}bit format ${sampleFormat}`);
+
+        const stripOffsets = tags[273];
+        const stripByteCounts = tags[279];
+        let pixelIndex = 0;
+        for (let s = 0; s < stripOffsets.length && pixelIndex < data.length; s++) {
+            const samplesInStrip = stripByteCounts[s] / bytesPerSample;
+            for (let k = 0; k < samplesInStrip && pixelIndex < data.length; k++, pixelIndex++) {
+                const off = stripOffsets[s] + k * bytesPerSample;
+                if (bitsPerSample === 32 && sampleFormat === 3) data[pixelIndex] = view.getFloat32(off, little);
+                else if (bitsPerSample === 16) data[pixelIndex] = view.getUint16(off, little);
+                else data[pixelIndex] = view.getUint8(off);
+            }
+        }
+
+        // Georeferencing: ModelPixelScale (33550) + ModelTiepoint (33922) give the
+        // world bounding box; GeoKeyDirectory (34735) gives the CRS (EPSG code).
+        let bbox = null;
+        if (tags[33550] && tags[33922]) {
+            const [sx, sy] = tags[33550];
+            const [, , , x0, y0] = tags[33922]; // pixel (0,0) maps to world (x0, y0)
+            bbox = [x0, y0 - height * sy, x0 + width * sx, y0]; // [minX, minY, maxX, maxY]
+        }
+
+        let epsg = null;
+        if (tags[34735]) {
+            const gk = tags[34735];
+            const numKeys = gk[3];
+            for (let k = 0; k < numKeys; k++) {
+                const keyId = gk[4 + k * 4];
+                const tiffTagLoc = gk[4 + k * 4 + 1];
+                const value = gk[4 + k * 4 + 3];
+                if (tiffTagLoc === 0 && (keyId === 2048 || keyId === 3072)) epsg = value;
+            }
+        }
+
+        let nodata = null;
+        if (tags[42113]) {
+            const n = parseFloat(tags[42113]);
+            if (!Number.isNaN(n)) nodata = n;
+        }
+
+        return { width, height, data, bbox, epsg, nodata };
+    }
+
+    // Some lightweight dev HTTP servers (this project's included Python one included)
+    // occasionally return an empty/204 response under rapid concurrent HTTP/1.1
+    // keep-alive requests despite logging 200 server-side - a connection-reuse quirk,
+    // not a real absence of the file. A quick retry papers over it harmlessly.
+    async function fetchArrayBufferWithRetry(url, attempts = 3) {
+        for (let i = 0; i < attempts; i++) {
+            const buffer = await (await fetch(url, { cache: 'no-store' })).arrayBuffer();
+            if (buffer.byteLength > 0) return buffer;
+        }
+        throw new Error(`Empty response from ${url} after ${attempts} attempts`);
+    }
+
+    // Inverse Transverse Mercator (UTM-family), for converting a projected MGA/UTM
+    // easting/northing back to lon/lat. Standard closed-form series (Snyder); GRS80
+    // vs WGS84 ellipsoid difference is sub-millimeter, irrelevant at this precision.
+    function utmInverse(easting, northing, zone, southHemisphere) {
+        const a = 6378137, f = 1 / 298.257222101;
+        const k0 = 0.9996;
+        const e2 = f * (2 - f);
+        const ep2 = e2 / (1 - e2);
+        const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+
+        const x = easting - 500000;
+        const y = southHemisphere ? northing - 10000000 : northing;
+
+        const M = y / k0;
+        const mu = M / (a * (1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256));
+
+        const phi1 = mu
+            + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu)
+            + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu)
+            + (151 * e1 ** 3 / 96) * Math.sin(6 * mu)
+            + (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
+
+        const N1 = a / Math.sqrt(1 - e2 * Math.sin(phi1) ** 2);
+        const T1 = Math.tan(phi1) ** 2;
+        const C1 = ep2 * Math.cos(phi1) ** 2;
+        const R1 = a * (1 - e2) / Math.pow(1 - e2 * Math.sin(phi1) ** 2, 1.5);
+        const D = x / (N1 * k0);
+
+        const lat = phi1 - (N1 * Math.tan(phi1) / R1) * (
+            D ** 2 / 2
+            - (5 + 3 * T1 + 10 * C1 - 4 * C1 ** 2 - 9 * ep2) * D ** 4 / 24
+            + (61 + 90 * T1 + 298 * C1 + 45 * T1 ** 2 - 252 * ep2 - 3 * C1 ** 2) * D ** 6 / 720
+        );
+        const lon = (D
+            - (1 + 2 * T1 + C1) * D ** 3 / 6
+            + (5 - 2 * C1 + 28 * T1 - 3 * C1 ** 2 + 8 * ep2 + 24 * T1 ** 2) * D ** 5 / 120
+        ) / Math.cos(phi1);
+
+        const centralMeridian = (zone - 1) * 6 - 180 + 3;
+        return [centralMeridian + lon * 180 / Math.PI, lat * 180 / Math.PI];
+    }
+
+    // Builds the (col,row) -> [lng,lat] converter for whatever CRS the source raster
+    // is actually in - these turned out to be GDA2020/MGA (a UTM-family projection
+    // in meters, e.g. EPSG:7855 = zone 55), not plain lon/lat as first assumed.
+    function makePixelToLngLat(bbox, width, height, epsg) {
+        const x = (col) => bbox[0] + (col + 0.5) / width * (bbox[2] - bbox[0]);
+        const y = (row) => bbox[3] - (row + 0.5) / height * (bbox[3] - bbox[1]);
+
+        if (epsg === 3857 || epsg === 900913) {
+            return (col, row) => [
+                (x(col) / 20037508.34) * 180,
+                (Math.atan(Math.exp((y(row) / 20037508.34) * Math.PI)) * 2 - Math.PI / 2) * (180 / Math.PI)
+            ];
+        }
+        if (epsg >= 7845 && epsg <= 7859) { // GDA2020 / MGA zone N (south)
+            const zone = epsg - 7800;
+            return (col, row) => utmInverse(x(col), y(row), zone, true);
+        }
+        if (epsg >= 28344 && epsg <= 28358) { // GDA94 / MGA zone N (south)
+            const zone = epsg - 28300;
+            return (col, row) => utmInverse(x(col), y(row), zone, true);
+        }
+        if (epsg >= 32701 && epsg <= 32760) { // WGS84 / UTM zone N south
+            return (col, row) => utmInverse(x(col), y(row), epsg - 32700, true);
+        }
+        if (epsg >= 32601 && epsg <= 32660) { // WGS84 / UTM zone N north
+            return (col, row) => utmInverse(x(col), y(row), epsg - 32600, false);
+        }
+        // EPSG:4326 (or unrecognised) - assume the bbox is already lon/lat degrees
+        return (col, row) => [x(col), y(row)];
+    }
+
+    async function loadRasterForStats(key) {
+        if (rasterStatsCache.has(key)) return rasterStatsCache.get(key);
+
+        const buffer = await fetchArrayBufferWithRetry(RASTER_LAYERS[key].url);
+        const parsed = parseSimpleTiff(buffer);
+        const { width, height, data, bbox, epsg, nodata } = parsed;
+        const pixelToLngLat = makePixelToLngLat(bbox, width, height, epsg);
+
+        const entry = { data, width, height, nodata, pixelToLngLat };
+        rasterStatsCache.set(key, entry);
+        return entry;
+    }
+
+    // Caps how many pixels get the expensive exact point-in-polygon test. These
+    // rasters are coarse (climate/hazard grids), so subsampling a large one loses
+    // negligible accuracy for a min/max or "which classes occur" summary, while
+    // keeping this from taking forever against a boundary with thousands of vertices.
+    const MAX_STAT_SAMPLES = 60000;
+
+    async function computeAOIStatsFor(key, simplifiedPolygon) {
+        const info = RASTER_LAYERS[key];
+        const raster = await loadRasterForStats(key);
+        const [minLng, minLat, maxLng, maxLat] = turf.bbox(simplifiedPolygon);
+
+        const totalPixels = raster.width * raster.height;
+        const stride = Math.max(1, Math.floor(Math.sqrt(totalPixels / MAX_STAT_SAMPLES)));
+
+        let min = Infinity, max = -Infinity;
+        const presentClasses = new Set();
+        let sampleCount = 0;
+
+        for (let row = 0; row < raster.height; row += stride) {
+            for (let col = 0; col < raster.width; col += stride) {
+                const v = raster.data[row * raster.width + col];
+                if (raster.nodata !== null && v === raster.nodata) continue;
+                if (!Number.isFinite(v)) continue;
+
+                const [lng, lat] = raster.pixelToLngLat(col, row);
+                // Cheap bbox rejection before the more expensive exact polygon test
+                if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue;
+                if (!turf.booleanPointInPolygon([lng, lat], simplifiedPolygon)) continue;
+
+                sampleCount++;
+                if (info.type === 'continuous') {
+                    if (v < min) min = v;
+                    if (v > max) max = v;
+                } else {
+                    presentClasses.add(Math.round(v));
+                }
+            }
+        }
+
+        if (sampleCount === 0) return null;
+        return info.type === 'continuous' ? { min, max } : { classes: presentClasses };
+    }
+
+    function formatStatNumber(v) {
+        const rounded = Math.round(v * 10) / 10;
+        return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    }
+
+    function saveOriginalLegendText(elId) {
+        if (originalLegendText.has(elId)) return;
+        const el = document.getElementById(elId);
+        if (el) originalLegendText.set(elId, el.textContent);
+    }
+
+    async function updateAOILegendRanges(polygon) {
+        // A hand-drawn or coastline-following AOI can have thousands of vertices;
+        // simplify once so the per-pixel point-in-polygon tests below (run per
+        // layer) stay fast. Tolerance is in degrees - ~0.003 is roughly 300m,
+        // negligible for these coarse climate/hazard grids.
+        const simplified = turf.simplify(polygon, { tolerance: 0.003, highQuality: false });
+
+        await Promise.all(Object.keys(RASTER_LAYERS).map(async (key) => {
+            try {
+                const stats = await computeAOIStatsFor(key, simplified);
+                if (!stats) return;
+
+                const info = RASTER_LAYERS[key];
+                if (info.type === 'continuous') {
+                    const maxEl = document.getElementById(`${key}-legend-max`);
+                    const minEl = document.getElementById(`${key}-legend-min`);
+                    if (maxEl) { saveOriginalLegendText(maxEl.id); maxEl.textContent = formatStatNumber(stats.max); }
+                    if (minEl) { saveOriginalLegendText(minEl.id); minEl.textContent = formatStatNumber(stats.min); }
+                } else {
+                    loadCategoricalLegend(key, info.classesUrl, stats.classes);
+                }
+            } catch (err) {
+                console.warn(`Could not compute AOI range for ${key}:`, err);
+            }
+        }));
+    }
+
+    function resetAOILegendRanges() {
+        originalLegendText.forEach((text, elId) => {
+            const el = document.getElementById(elId);
+            if (el) el.textContent = text;
+        });
+        originalLegendText.clear();
+        // forestmat/inundation are never touched by updateAOILegendRanges (see
+        // RASTER_LAYERS comment above), so only cyclone needs reloading here.
+        loadCategoricalLegend('cyclone', RASTER_LAYERS.cyclone.classesUrl);
+    }
+
+    document.getElementById('aoi-file-input').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        let geojson;
+        try {
+            geojson = JSON.parse(await file.text());
+        } catch (err) {
+            alert('Could not read that file as GeoJSON/JSON.');
+            e.target.value = '';
+            return;
+        }
+
+        const polygon = extractPolygon(geojson);
+        if (!polygon) {
+            alert('No Polygon/MultiPolygon geometry found. Please upload a GeoJSON boundary.');
+            e.target.value = '';
+            return;
+        }
+
+        applyAOI(polygon);
+        setAOIStatus(`AOI loaded: ${file.name} — computing ranges…`, true);
+        await updateAOILegendRanges(polygon);
+        setAOIStatus(`AOI loaded: ${file.name}`, true);
+    });
+
+    document.getElementById('aoi-clear-btn').addEventListener('click', clearAOI);
+
+    // ==================== EXPORT MAP TO PNG ====================
+    // Flattens the view, assembles a clean legend from active layers, shows a
+    // north arrow + title, then snapshots the page with html2canvas.
+
+    function getActiveLayerLegends() {
+        const items = [];
+        document.querySelectorAll('.layer-item').forEach(item => {
+            const toggle = item.querySelector('input[type="checkbox"]');
+            if (!toggle || !toggle.checked) return;
+            const key = toggle.id.replace('-toggle', '');
+            const legend = document.getElementById(`${key}-legend`);
+            if (!legend || !legend.innerHTML.trim()) return;
+            const nameEl = item.querySelector('.layer-name');
+            items.push({
+                name: nameEl ? nameEl.textContent.trim() : key,
+                html: legend.innerHTML
+            });
+        });
+        return items;
+    }
+
+    function buildExportLegend() {
+        const container = document.getElementById('export-legend');
+        const items = getActiveLayerLegends();
+        if (items.length === 0) {
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:11px;">No data layers active</div>';
+            return;
+        }
+        container.innerHTML = items.map(it => `
+            <div class="export-legend-item">
+                <div class="export-legend-item-title">${it.name}</div>
+                ${it.html}
+            </div>
+        `).join('');
+    }
+
+    // Custom scale bar, computed the same way MapLibre's own ScaleControl does
+    // (rounds to a "nice" number of meters/km), but drawn with our own markup so
+    // it always has guaranteed contrast against the map underneath it. Rounds UP
+    // to the next nice step (rather than down, like a typical cartographic scale
+    // bar would) so the bar is guaranteed to reach the target width, not fall
+    // short of it.
+    function niceRoundNumberCeil(value) {
+        const pow10 = Math.pow(10, Math.floor(Math.log10(value)));
+        const d = value / pow10;
+        const niceD = d <= 1 ? 1 : d <= 2 ? 2 : d <= 5 ? 5 : 10;
+        return niceD * pow10;
+    }
+
+    function buildExportScaleBar(targetWidthPx) {
+        const center = map.getCenter();
+        const metersPerPixel = 156543.03392 * Math.cos(center.lat * Math.PI / 180) / Math.pow(2, map.getZoom());
+        const minBarPx = targetWidthPx * 0.20; // scale bar should span >= 20% of the export width
+        const niceDistance = niceRoundNumberCeil(metersPerPixel * minBarPx);
+        const barPx = niceDistance / metersPerPixel;
+        const label = niceDistance >= 1000
+            ? `${(niceDistance / 1000).toFixed(niceDistance >= 10000 ? 0 : 1)} km`
+            : `${Math.round(niceDistance)} m`;
+
+        document.getElementById('export-scalebar').innerHTML = `
+            <div class="export-scalebar-label">${label}</div>
+            <div class="export-scalebar-bar" style="width:${barPx}px"></div>
+        `;
+    }
+
+    // Report-ready output sizes (roughly A4 at ~150 DPI). The map container is
+    // temporarily resized to these dimensions so it actually re-renders the extent
+    // in that shape, rather than just cropping/letterboxing a screen-sized capture.
+    const EXPORT_SIZES = {
+        landscape: { w: 1754, h: 1240 },
+        portrait: { w: 1240, h: 1754 }
+    };
+
+    async function exportMap() {
+        const btn = document.getElementById('export-map-btn');
+        const originalBtnText = btn.textContent;
+        btn.textContent = 'Exporting…';
+        btn.disabled = true;
+
+        const includeNorth = document.getElementById('export-north-arrow').checked;
+        const includeScale = document.getElementById('export-scale-bar').checked;
+        const includeLegend = document.getElementById('export-legend-check').checked;
+        const customTitle = document.getElementById('export-title-input').value.trim();
+        const orientation = document.getElementById('export-orientation').value;
+
+        const prevCenter = map.getCenter();
+        const prevZoom = map.getZoom();
+        const prevPitch = map.getPitch();
+        const prevBearing = map.getBearing();
+        const prevProjection = map.getProjection ? map.getProjection() : null;
+
+        const titleH1 = document.querySelector('.title-bar h1');
+        const originalTitleText = titleH1.textContent;
+        const originalTitleFontSize = titleH1.style.fontSize;
+        const subtitleP = document.querySelector('.title-bar p');
+        const toolsPanel = document.querySelector('.tools-panel');
+        const layerPanel = document.querySelector('.layer-panel');
+        const coordsDisplay = document.querySelector('.coords-display');
+        const navCtrl = document.querySelector('.maplibregl-ctrl-group');
+        const scaleCtrl = document.querySelector('.maplibregl-ctrl-scale');
+        const northArrowEl = document.getElementById('north-arrow');
+        const exportLegendEl = document.getElementById('export-legend');
+        const scaleBarEl = document.getElementById('export-scalebar');
+        const originalBodyBackground = document.body.style.background;
+
+        const originalBodyBox = {
+            position: document.body.style.position,
+            width: document.body.style.width,
+            height: document.body.style.height,
+            overflow: document.body.style.overflow
+        };
+        let resized = false;
+
+        try {
+            // Flatten to a true top-down view so the north arrow & scale bar are accurate
+            map.jumpTo({ pitch: 0, bearing: 0 });
+            if (map.getProjection && map.getProjection().type !== 'mercator') {
+                map.setProjection({ type: 'mercator' });
+            }
+
+            const targetSize = EXPORT_SIZES[orientation];
+            if (targetSize) {
+                // Body has no explicit position, so absolutely-positioned overlays (title,
+                // legend, north arrow, ...) size against the viewport, not the body box.
+                // Giving body an explicit position makes it the containing block instead,
+                // so resizing it reflows those overlays to match the new map shape too.
+                document.body.style.position = 'relative';
+                document.body.style.width = targetSize.w + 'px';
+                document.body.style.height = targetSize.h + 'px';
+                document.body.style.overflow = 'hidden';
+                map.resize();
+                resized = true;
+            }
+
+            const captureWidth = resized ? targetSize.w : window.innerWidth;
+            const captureHeight = resized ? targetSize.h : window.innerHeight;
+
+            // An uploaded AOI should always be the star of the export, regardless of
+            // however the map happens to be panned/zoomed right now (or whether the
+            // orientation resize above just changed the aspect ratio it needs to fit).
+            // Padding is a fraction of the frame (not a fixed px value) so the AOI reads
+            // as ~90% coverage - leaving a consistent margin for the title/credits -
+            // no matter how big the output canvas is.
+            if (aoiPolygon) {
+                const AOI_MARGIN_FRACTION = 0.05; // 5% each side => ~90% coverage
+                map.fitBounds(turf.bbox(aoiPolygon), {
+                    padding: {
+                        top: captureHeight * AOI_MARGIN_FRACTION,
+                        bottom: captureHeight * AOI_MARGIN_FRACTION,
+                        left: captureWidth * AOI_MARGIN_FRACTION,
+                        right: captureWidth * AOI_MARGIN_FRACTION
+                    },
+                    duration: 0
+                });
+            }
+
+            await new Promise(resolve => map.once('idle', resolve));
+            await new Promise(resolve => setTimeout(resolve, 150));
+
+            if (customTitle) titleH1.textContent = customTitle;
+            titleH1.style.fontSize = '32px';
+            if (subtitleP) subtitleP.style.display = 'none';
+            toolsPanel.style.display = 'none';
+            layerPanel.style.display = 'none';
+            coordsDisplay.style.display = 'none';
+            if (navCtrl) navCtrl.style.display = 'none';
+            // Native scale control is always hidden in favor of our own scale bar below,
+            // which has a guaranteed-contrast background instead of relying on the map.
+            if (scaleCtrl) scaleCtrl.style.display = 'none';
+
+            northArrowEl.classList.toggle('visible', includeNorth);
+
+            if (includeScale) {
+                buildExportScaleBar(captureWidth);
+                scaleBarEl.classList.add('visible');
+            } else {
+                scaleBarEl.classList.remove('visible');
+            }
+
+            if (includeLegend) {
+                buildExportLegend();
+                exportLegendEl.classList.add('visible');
+            } else {
+                exportLegendEl.classList.remove('visible');
+            }
+
+            await new Promise(resolve => requestAnimationFrame(resolve));
+
+            // html2canvas can't rasterize the WebGL map canvas (it comes out blank), so it's
+            // captured separately and composited underneath the DOM chrome. This map's WebGL
+            // context ends up with preserveDrawingBuffer:false regardless of the Map
+            // constructor option, so the pixels MUST be grabbed synchronously inside a
+            // 'render' callback - by the time an async html2canvas() call resolves, the
+            // buffer has already been overwritten by later frames and reads back blank.
+            const mapCanvas = map.getCanvas();
+            const mapImage = new Image();
+            const mapImageLoaded = new Promise((resolve, reject) => {
+                mapImage.onload = resolve;
+                mapImage.onerror = reject;
+            });
+            map.once('render', () => {
+                mapImage.src = mapCanvas.toDataURL('image/png');
+            });
+            map.triggerRepaint();
+            await mapImageLoaded;
+
+            // body has an explicit CSS background-color, which html2canvas's
+            // backgroundColor:null option does NOT override (it only applies when no
+            // background is otherwise detected) - so force it transparent here or the
+            // captured overlay paints an opaque backdrop straight over the map layer.
+            document.body.style.background = 'transparent';
+
+            const overlayCanvas = await html2canvas(document.body, {
+                useCORS: true,
+                backgroundColor: null,
+                logging: false,
+                // Only skip the WebGL canvas itself (it reads blank via html2canvas) - the
+                // map's other children (attribution) are real DOM and must stay, so don't
+                // ignore the whole #map container.
+                ignoreElements: (el) => el.tagName === 'CANVAS' && el.classList.contains('maplibregl-canvas'),
+                width: captureWidth,
+                height: captureHeight,
+                windowWidth: captureWidth,
+                windowHeight: captureHeight
+            });
+
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = mapCanvas.width;
+            finalCanvas.height = mapCanvas.height;
+            const ctx = finalCanvas.getContext('2d');
+            ctx.drawImage(mapImage, 0, 0, finalCanvas.width, finalCanvas.height);
+            ctx.drawImage(overlayCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
+
+            const link = document.createElement('a');
+            link.download = `wet-tropics-map-${Date.now()}.png`;
+            link.href = finalCanvas.toDataURL('image/png');
+            link.click();
+        } catch (err) {
+            console.error('Export failed:', err);
+            alert('Map export failed (likely a cross-origin restriction on the Satellite basemap tiles). ' +
+                'Try switching the base map to "Street Map" and export again.');
+        } finally {
+            document.body.style.background = originalBodyBackground;
+            titleH1.textContent = originalTitleText;
+            titleH1.style.fontSize = originalTitleFontSize;
+            if (subtitleP) subtitleP.style.display = '';
+            toolsPanel.style.display = '';
+            layerPanel.style.display = '';
+            coordsDisplay.style.display = '';
+            if (navCtrl) navCtrl.style.display = '';
+            if (scaleCtrl) scaleCtrl.style.display = '';
+            northArrowEl.classList.remove('visible');
+            exportLegendEl.classList.remove('visible');
+            scaleBarEl.classList.remove('visible');
+
+            if (resized) {
+                document.body.style.position = originalBodyBox.position;
+                document.body.style.width = originalBodyBox.width;
+                document.body.style.height = originalBodyBox.height;
+                document.body.style.overflow = originalBodyBox.overflow;
+                map.resize();
+            }
+
+            // Restore center/zoom too - fitting to the AOI (or the orientation resize)
+            // may have moved the live view, and export shouldn't leave that behind.
+            map.jumpTo({ center: prevCenter, zoom: prevZoom, pitch: prevPitch, bearing: prevBearing });
+            if (prevProjection && map.setProjection) map.setProjection(prevProjection);
+
+            btn.textContent = originalBtnText;
+            btn.disabled = false;
+        }
+    }
+
+    document.getElementById('export-map-btn').addEventListener('click', exportMap);
+
+</script>
+</body>
+</html>

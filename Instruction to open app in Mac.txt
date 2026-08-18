@@ -1,0 +1,88 @@
+HOW TO OPEN THE MAP ON A MAC
+=============================
+
+METHOD 1 - Double-click (try this first)
+-----------------------------------------
+Since this isn't a signed/notarized app, macOS will show "cannot be opened
+because it is from an unidentified developer" (or similar) on first
+double-click of Launch_map_MAC.command.
+
+1. Right-click (or Control-click) Launch_map_MAC.command -> Open -> Open.
+   This bypasses Gatekeeper for that file only, and only needs doing once.
+
+2. If step 1 doesn't show an "Open" option (newer macOS versions, e.g.
+   Ventura/Sonoma/Sequoia, sometimes only show "Done" or "Move to Trash"
+   with no way to open it):
+   - Go to System Settings -> Privacy & Security.
+   - Scroll to the bottom. You'll see a message like
+     "Launch_map_MAC.command was blocked to protect your Mac."
+   - Click "Open Anyway", then confirm with your password/Touch ID.
+   - Go back and double-click Launch_map_MAC.command again.
+
+If the map opens in your browser, you're done - no further steps needed.
+
+
+METHOD 2 - Run it via Terminal (guaranteed fallback if Method 1 fails)
+------------------------------------------------------------------------
+This bypasses the double-click Gatekeeper prompts entirely and is the most
+reliable way to get the bundled launcher script running.
+
+1. Open Terminal: press Cmd+Space, type "Terminal", press Enter.
+
+2. Move into the project folder. Type "cd " (with a trailing space), then
+   drag the project folder from Finder into the Terminal window - this
+   auto-fills the correct path - then press Enter.
+
+3. Run these two commands, one at a time:
+
+     xattr -dr com.apple.quarantine .
+     chmod +x Launch_map_MAC.command
+
+4. Now run the script:
+
+     ./Launch_map_MAC.command
+
+   This does exactly what double-clicking does (starts the server, opens
+   the map in your browser) but without any Gatekeeper popups.
+
+Leave that Terminal window open while you use the map - closing it stops
+the server. To stop it manually, press Ctrl+C in that window.
+
+
+METHOD 3 - Fully manual server start (100% guaranteed, use if Methods 1 and 2 fail)
+---------------------------------------------------------------------------------------
+Use this if Launch_map_MAC.command still won't run (e.g. it can't download
+Node.js because there's no internet connection, or something else about the
+script fails). This starts a local web server by hand using tools already
+built into macOS, the same way the Windows version uses its own bundled
+Python.
+
+1. Open Terminal (Cmd+Space, type "Terminal", Enter).
+
+2. Move into the project folder as in Method 2, step 2 (type "cd ", drag
+   the folder in, press Enter).
+
+3. Start a local server on port 8000:
+
+     python3 -m http.server 8000
+
+   - If you see "Starting server..." or similar with no errors, it's
+     working - leave this Terminal window open.
+   - If macOS prompts you to install "Command Line Developer Tools",
+     click Install, wait for it to finish (a few minutes, needs internet),
+     then run the "python3 -m http.server 8000" command again.
+
+4. Open a web browser and go to this address:
+
+     http://localhost:8000/index_long.html
+
+5. When you're done, go back to the Terminal window and press Ctrl+C to
+   stop the server.
+
+If python3 is unavailable for some reason, Node.js works the same way, but
+server.js listens on port 8080 by default (not 8000), so either open the
+matching URL or set PORT explicitly to keep it at 8000:
+
+     PORT=8000 node server.js
+
+then open http://localhost:8000/index_long.html
