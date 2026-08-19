@@ -1,0 +1,92 @@
+[
+  {
+    "value": 1,
+    "color": "#d4e09b",
+    "label": "Mixed species woodlands"
+  },
+  {
+    "value": 2,
+    "color": "#4F7942",
+    "label": "Eucalypt open forests to woodlands on floodplains"
+  },
+  {
+    "value": 3,
+    "color": "#DEC1C5",
+    "label": "Non-remnant"
+  },
+  {
+    "value": 4,
+    "color": "#5e4fa2",
+    "label": "Other coastal communities or heaths"
+  },
+  {
+    "value": 5,
+    "color": "#D1F55B",
+    "label": "Eucalypt woodlands to open forests (mainly Eastern)"
+  },
+  {
+    "value": 6,
+    "color": "#B8B6CC",
+    "label": "Melaleuca open-woodlands on depositional plains"
+  },
+  {
+    "value": 7,
+    "color": "#B58628",
+    "label": "Eucalypt dry woodlands on inland depositional plains"
+  },
+  {
+    "value": 8,
+    "color": "#3d6b4f",
+    "label": "Rainforests and scrubs (unclassified)"
+  },
+  {
+    "value": 9,
+    "color": "#ffffbf",
+    "label": "Tussock grasslands, forblands"
+  },
+  {
+    "value": 10,
+    "color": "#1e6091",
+    "label": "Wetlands (swamps and lakes)"
+  },
+  {
+    "value": 11,
+    "color": "#4ea8de",
+    "label": "Water"
+  },
+  {
+    "value": 12,
+    "color": "#08306b",
+    "label": "Mangroves and saltmarshes"
+  },
+  {
+    "value": 13,
+    "color": "#e9ecef",
+    "label": "Plantations"
+  },
+  {
+    "value": 14,
+    "color": "#13E815",
+    "label": "Wet eucalypt open forests"
+  },
+  {
+    "value": 15,
+    "color": "#d9a066",
+    "label": "Callitris woodland - open forests"
+  },
+  {
+    "value": 16,
+    "color": "#00441b",
+    "label": "Rainforests and scrubs - Notophyll"
+  },
+  {
+    "value": 17,
+    "color": "#94DE7E",
+    "label": "Rainforests and scrubs - Mesophyll"
+  },
+  {
+    "value": 18,
+    "color": "#454B1B",
+    "label": "Rainforests and scrubs - Microphyll"
+  }
+]

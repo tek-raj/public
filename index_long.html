@@ -1352,6 +1352,30 @@
             <div id="forestmat-legend-content" style="font-size: 10px; color: rgba(255,255,255,0.6);">Loading legend...</div>
         </div>
 
+        <!-- Broad Vegetation Groups -->
+        <div class="layer-item">
+            <div class="layer-info">
+                <div class="layer-details">
+                    <span class="layer-name">Broad Vegetation Groups</span>
+                    <span class="layer-description">Broad vegetation groups, with detailed rainforest phyll types where mapped</span>
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="broadveg-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-left: 46px;">
+            <button class="legend-toggle-btn" onclick="toggleLegend('broadveg-legend')">📊 Legend</button>
+            <div class="opacity-control-inline">
+                <input type="range" class="opacity-slider" id="broadveg-opacity" min="0" max="100" value="70">
+                <span style="color: rgba(255, 255, 255, 0.6); font-size: 11px;" id="broadveg-opacity-value">70%</span>
+            </div>
+        </div>
+        <div class="legend-container" id="broadveg-legend">
+            <div id="broadveg-legend-content" style="font-size: 10px; color: rgba(255,255,255,0.6);">Loading legend...</div>
+        </div>
+
         <!-- Max Temperature Change -->
         <div class="layer-item">
             <div class="layer-info">
@@ -1755,6 +1779,14 @@
                     maxzoom: 10,
                     attribution: 'Forest Maturity Index'
                 },
+                broadVegData: {
+                    type: 'raster',
+                    tiles: ['./Broad_vegetation_groups_3857/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Broad Vegetation Groups'
+                },
 
                 maxTempData: {
                     type: 'raster',
@@ -1886,6 +1918,13 @@
                     id: 'forestmat-layer',
                     type: 'raster',
                     source: 'forestMaturityData',
+                    paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
+                    layout: { visibility: 'none' }
+                },
+                {
+                    id: 'broadveg-layer',
+                    type: 'raster',
+                    source: 'broadVegData',
                     paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 300 },
                     layout: { visibility: 'none' }
                 },
@@ -2135,6 +2174,7 @@
     wireLayer('cyclone', 'cyclone-layer');
     wireLayer('canopy', 'canopy-layer');
     wireLayer('forestmat', 'forestmat-layer');
+    wireLayer('broadveg', 'broadveg-layer');
     wireLayer('maxtemp', 'maxtemp-layer');
     wireLayer('Absmaxtemp', 'Absmaxtemp-layer');
     wireLayer('Absmintemp', 'Absmintemp-layer');
@@ -2179,6 +2219,7 @@
 
     loadCategoricalLegend('cyclone', './100_year_return_probablity_of_tropical_cyclone_3857_classes.json');
     loadCategoricalLegend('forestmat', './Forest_maturity_3857_classes.json');
+    loadCategoricalLegend('broadveg', './Broad_vegetation_groups_3857_classes.json');
     loadCategoricalLegend('inundation', './Inundation_by_SLR_during_high_tide_3857_classes.json');
 
     // ==================== AREA OF INTEREST (AOI) CLIPPING ====================
