@@ -312,17 +312,133 @@
         }
 
         /* Responsive */
+        /* Mobile panel toggle/close controls: hidden on desktop, shown only under the breakpoint below */
+        .panel-toggle-btn,
+        .panel-close-btn,
+        .panel-backdrop {
+            display: none;
+        }
+
         @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+
             .title-bar {
                 top: 10px;
-                padding: 12px 20px;
+                max-width: calc(100vw - 120px);
+                padding: 10px 14px;
             }
-            
+
             .title-bar h1 {
-                font-size: 16px;
+                font-size: 14px;
             }
-            
+
+            .title-bar p {
+                font-size: 11px;
+            }
+
+            .title-bar .credit-line {
+                font-size: 9px;
+            }
+
+            .coords-display {
+                bottom: 4px;
+                padding: 6px 10px;
+            }
+
+            .coords-display span {
+                font-size: 10px;
+            }
+
+            /* Both side panels become full-height off-canvas drawers, closed by default */
+            .tools-panel,
             .layer-panel {
+                top: 0;
+                bottom: 0;
+                width: min(85vw, 320px);
+                max-height: none;
+                height: 100%;
+                border-radius: 0;
+                overflow-y: auto;
+                z-index: 30;
+                transition: transform 0.3s ease;
+            }
+
+            .tools-panel {
+                left: 0;
+                transform: translateX(-100%);
+            }
+
+            .layer-panel {
+                right: 0;
+                transform: translateX(100%);
+            }
+
+            .tools-panel.open,
+            .layer-panel.open {
+                transform: translateX(0);
+            }
+
+            /* Round floating buttons that open each drawer */
+            .panel-toggle-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: absolute;
+                top: 12px;
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
+                background: rgba(15, 23, 42, 0.85);
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                font-size: 18px;
+                z-index: 20;
+                cursor: pointer;
+            }
+
+            #tools-toggle-btn {
+                left: 12px;
+            }
+
+            #layer-toggle-btn {
+                right: 12px;
+            }
+
+            /* Close button inside each drawer's header, mobile-only */
+            .panel-close-btn {
+                display: block;
+                background: none;
+                border: none;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 20px;
+                line-height: 1;
+                cursor: pointer;
+                padding: 4px 6px;
+            }
+
+            /* Dimmed backdrop behind an open drawer */
+            .panel-backdrop {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 25;
+            }
+
+            .panel-backdrop.open {
+                display: block;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .title-bar {
+                max-width: calc(100vw - 100px);
+            }
+
+            .title-bar .credit-line br {
                 display: none;
             }
         }
@@ -760,6 +876,11 @@
 
 <div id="map"></div>
 
+<!-- Mobile-only: buttons that open the Tools/Layers drawers, and the dimmed backdrop behind an open drawer -->
+<button class="panel-toggle-btn" id="tools-toggle-btn" aria-label="Open map tools" title="Map Tools">🧭</button>
+<button class="panel-toggle-btn" id="layer-toggle-btn" aria-label="Open layers" title="Layers">🗂️</button>
+<div class="panel-backdrop" id="panel-backdrop"></div>
+
 <!-- Title Bar -->
 <div class="title-bar">
     <h1>Wet Tropics Climate Risk</h1>
@@ -770,9 +891,10 @@
 </div>
 
 <!-- AOI Clip & Export Tools Panel -->
-<div class="tools-panel">
+<div class="tools-panel" id="tools-panel">
     <div class="panel-header">
         <h2>🧭 Map Tools</h2>
+        <button class="panel-close-btn" id="tools-close-btn" aria-label="Close map tools">✕</button>
     </div>
 
     <div class="tools-section">
@@ -843,9 +965,10 @@
 </div>
 
 <!-- Layer Control Panel -->
-<div class="layer-panel">
+<div class="layer-panel" id="layer-panel">
     <div class="panel-header">
         <h2>🗂️ Layers</h2>
+        <button class="panel-close-btn" id="layer-close-btn" aria-label="Close layers">✕</button>
     </div>
 
     <!-- Base Maps -->
@@ -1635,6 +1758,32 @@
             group.classList.toggle('collapsed');
         }
     }
+
+    // ==================== MOBILE DRAWER TOGGLES (Tools / Layers panels) ====================
+
+    (function setupMobileDrawers() {
+        const toolsPanel = document.getElementById('tools-panel');
+        const layerPanel = document.getElementById('layer-panel');
+        const backdrop = document.getElementById('panel-backdrop');
+
+        function closeDrawers() {
+            toolsPanel.classList.remove('open');
+            layerPanel.classList.remove('open');
+            backdrop.classList.remove('open');
+        }
+
+        function openDrawer(panel) {
+            closeDrawers();
+            panel.classList.add('open');
+            backdrop.classList.add('open');
+        }
+
+        document.getElementById('tools-toggle-btn').addEventListener('click', () => openDrawer(toolsPanel));
+        document.getElementById('layer-toggle-btn').addEventListener('click', () => openDrawer(layerPanel));
+        document.getElementById('tools-close-btn').addEventListener('click', closeDrawers);
+        document.getElementById('layer-close-btn').addEventListener('click', closeDrawers);
+        backdrop.addEventListener('click', closeDrawers);
+    })();
 
     // ==================== LEGEND TOGGLE FUNCTION ====================
     
