@@ -295,6 +295,62 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
+        /* Floating draw toolbar - only visible while placing a point or drawing a
+           polygon. Positioned above the coordinates display so both stay legible. */
+        .draw-toolbar {
+            display: none;
+            position: absolute;
+            bottom: 56px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            align-items: center;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            padding: 8px 10px 8px 16px;
+            border-radius: 20px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .draw-toolbar.visible {
+            display: flex;
+        }
+
+        .draw-toolbar-hint {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .draw-toolbar-btn {
+            border: none;
+            border-radius: 14px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .draw-toolbar-finish {
+            background: #4f9cf7;
+            color: #ffffff;
+        }
+
+        .draw-toolbar-finish:disabled {
+            background: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.4);
+            cursor: not-allowed;
+        }
+
+        .draw-toolbar-cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
         .coords-display span {
             color: rgba(255, 255, 255, 0.8);
             font-size: 12px;
@@ -345,6 +401,23 @@
             .coords-display {
                 bottom: 4px;
                 padding: 6px 10px;
+            }
+
+            .annotation-label-popup input[type="text"] {
+                width: 160px;
+            }
+
+            .draw-toolbar {
+                max-width: calc(100vw - 24px);
+                bottom: 48px;
+                padding: 6px 8px 6px 12px;
+                gap: 6px;
+            }
+
+            .draw-toolbar-hint {
+                font-size: 11px;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
 
             .coords-display span {
@@ -761,6 +834,133 @@
             color: #6fd08c;
         }
 
+        /* Annotations (draw point/polygon + label) */
+        .annotation-mode-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .annotation-mode-row .tools-btn {
+            width: auto;
+            flex: 1;
+            margin-top: 0;
+        }
+
+        .annotation-mode-btn.active {
+            background: #4f9cf7;
+            color: #ffffff;
+        }
+
+        .annotation-list {
+            margin-top: 10px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .annotation-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 6px;
+        }
+
+        .annotation-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .annotation-item-label {
+            flex: 1;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .annotation-delete-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 14px;
+            cursor: pointer;
+            padding: 0 2px;
+            flex-shrink: 0;
+        }
+
+        .annotation-delete-btn:hover {
+            color: #ff6b6b;
+        }
+
+        /* Popup used to label a point/polygon right after it's drawn */
+        .maplibregl-popup.annotation-label-popup .maplibregl-popup-content {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .maplibregl-popup.annotation-label-popup .maplibregl-popup-tip {
+            border-top-color: rgba(15, 23, 42, 0.95);
+            border-bottom-color: rgba(15, 23, 42, 0.95);
+        }
+
+        .annotation-label-popup .annotation-label-title {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .annotation-label-popup input[type="text"] {
+            width: 200px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .annotation-label-popup .annotation-label-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .annotation-label-popup .annotation-label-actions button {
+            flex: 1;
+            padding: 7px;
+            border-radius: 7px;
+            border: none;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .annotation-label-save {
+            background: #4f9cf7;
+            color: #ffffff;
+        }
+
+        .annotation-label-cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
         /* North arrow (shown only while exporting). Has its own opaque badge
            background - the map underneath can be light or dark at any corner,
            so the arrow can't rely on the basemap for contrast. */
@@ -915,6 +1115,26 @@
 
         <div class="aoi-status" id="aoi-status">No AOI loaded — full extent shown</div>
         <button class="tools-btn tools-btn-secondary" id="aoi-clear-btn">Clear AOI</button>
+    </div>
+
+    <div class="tools-section">
+        <div class="tools-section-title">Annotations</div>
+
+        <div class="tools-inline-row" style="margin-top: 0;">
+            <label class="tools-field-label" for="annotation-color" style="margin-bottom: 0;">Colour</label>
+            <input type="color" id="annotation-color" value="#ff3b30">
+        </div>
+
+        <div class="annotation-mode-row">
+            <button class="tools-btn tools-btn-secondary annotation-mode-btn" id="add-point-btn">📍 Add Point</button>
+            <button class="tools-btn tools-btn-secondary annotation-mode-btn" id="add-polygon-btn">▱ Draw Polygon</button>
+        </div>
+
+        <div class="aoi-status" id="annotation-status">Click a button above to start</div>
+
+        <div class="annotation-list" id="annotation-list"></div>
+
+        <button class="tools-btn tools-btn-secondary" id="clear-annotations-btn">Clear All Annotations</button>
     </div>
 
     <div class="tools-section">
@@ -1405,6 +1625,15 @@
     <span id="coordinates">Lat: -17.00° | Lng: 145.70°</span>
 </div>
 
+<!-- Floating toolbar shown only while actively placing a point or drawing a polygon -
+     works whether or not the Tools drawer is open, which matters most on mobile where
+     the drawer is closed automatically as soon as drawing starts. -->
+<div class="draw-toolbar" id="draw-toolbar">
+    <span class="draw-toolbar-hint" id="draw-toolbar-hint"></span>
+    <button class="draw-toolbar-btn draw-toolbar-finish" id="finish-polygon-btn">✓ Finish</button>
+    <button class="draw-toolbar-btn draw-toolbar-cancel" id="cancel-draw-btn">✕ Cancel</button>
+</div>
+
 <script>
     // Initialize map with GLOBE projection
     const map = new maplibregl.Map({
@@ -1419,6 +1648,10 @@
         
         style: {
             "version": 8,
+            // Public glyphs source - needed for the annotation labels (symbol/text-field
+            // layers can't render text at all without a glyphs URL; this basemap uses
+            // raster tiles only, so no vector-style glyph source was configured before).
+            "glyphs": "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
             'projection': {
                 'type': 'globe'
             },
@@ -1741,6 +1974,7 @@
     // Wait for map to load
     map.on('load', () => {
         console.log('🌍 Map loaded with all climate & landscape layers!');
+        setupAnnotationLayers();
     });
 
     // Update coordinates display on mouse move
@@ -1982,6 +2216,318 @@
         resetAOILegendRanges();
         setAOIStatus('No AOI loaded — full extent shown', false);
     }
+
+    // ==================== ANNOTATIONS (draw point/polygon + label) ====================
+    // Lets a user drop a labelled point or draw a labelled polygon directly on the map -
+    // e.g. marking a survey plot inside the Forest Maturity layer - so it appears in the
+    // exported PNG. Rendered as native MapLibre GL layers (not DOM markers), so the
+    // existing export pipeline picks them up automatically via map.getCanvas() with no
+    // changes needed there.
+
+    let annotations = []; // { id, kind: 'point'|'polygon', label, color, geometry }
+    let annotationMode = null; // null | 'point' | 'polygon'
+    let annotationVertices = []; // in-progress polygon vertices, as [lng, lat]
+    let annotationIdCounter = 0;
+    let annotationPopupOpen = false; // guards against a stray click starting a new shape while a label popup is open
+    let currentAnnotationPopup = null; // so exportMap() can force-close a popup left open mid-label
+
+    function setupAnnotationLayers() {
+        map.addSource('annotations-source', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+        });
+
+        map.addLayer({
+            id: 'annotation-polygons-fill',
+            type: 'fill',
+            source: 'annotations-source',
+            filter: ['==', ['get', 'kind'], 'polygon'],
+            paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.25 }
+        });
+
+        map.addLayer({
+            id: 'annotation-polygons-outline',
+            type: 'line',
+            source: 'annotations-source',
+            filter: ['==', ['get', 'kind'], 'polygon'],
+            paint: { 'line-color': ['get', 'color'], 'line-width': 2.5 }
+        });
+
+        map.addLayer({
+            id: 'annotation-points',
+            type: 'circle',
+            source: 'annotations-source',
+            filter: ['==', ['get', 'kind'], 'point'],
+            paint: {
+                'circle-radius': 7,
+                'circle-color': ['get', 'color'],
+                'circle-stroke-color': '#ffffff',
+                'circle-stroke-width': 2
+            }
+        });
+
+        map.addLayer({
+            id: 'annotation-labels',
+            type: 'symbol',
+            source: 'annotations-source',
+            layout: {
+                'text-field': ['get', 'label'],
+                'text-size': 13,
+                'text-font': ['Open Sans Bold'],
+                'text-offset': ['case', ['==', ['get', 'kind'], 'point'], ['literal', [0, 1.4]], ['literal', [0, 0]]],
+                'text-anchor': ['case', ['==', ['get', 'kind'], 'point'], 'top', 'center'],
+                'text-allow-overlap': true,
+                'text-max-width': 10
+            },
+            paint: {
+                'text-color': '#ffffff',
+                'text-halo-color': 'rgba(0, 0, 0, 0.85)',
+                'text-halo-width': 1.4
+            }
+        });
+
+        // Dashed preview of the polygon currently being drawn
+        map.addSource('annotation-draft-source', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+        });
+
+        map.addLayer({
+            id: 'annotation-draft-line',
+            type: 'line',
+            source: 'annotation-draft-source',
+            filter: ['==', ['geometry-type'], 'LineString'],
+            paint: { 'line-color': '#ffcc00', 'line-width': 2, 'line-dasharray': [2, 2] }
+        });
+
+        map.addLayer({
+            id: 'annotation-draft-points',
+            type: 'circle',
+            source: 'annotation-draft-source',
+            filter: ['==', ['geometry-type'], 'Point'],
+            paint: {
+                'circle-radius': 5,
+                'circle-color': '#ffcc00',
+                'circle-stroke-color': '#0a0e27',
+                'circle-stroke-width': 1.5
+            }
+        });
+    }
+
+    function renderAnnotations() {
+        const source = map.getSource('annotations-source');
+        if (!source) return;
+        source.setData({
+            type: 'FeatureCollection',
+            features: annotations.map(a => ({
+                type: 'Feature',
+                properties: { id: a.id, kind: a.kind, label: a.label, color: a.color },
+                geometry: a.geometry
+            }))
+        });
+    }
+
+    function renderAnnotationDraft() {
+        const source = map.getSource('annotation-draft-source');
+        if (!source) return;
+        const features = annotationVertices.map(v => ({
+            type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: v }
+        }));
+        if (annotationVertices.length > 1) {
+            features.push({
+                type: 'Feature', properties: {},
+                geometry: { type: 'LineString', coordinates: annotationVertices }
+            });
+        }
+        source.setData({ type: 'FeatureCollection', features });
+
+        document.getElementById('finish-polygon-btn').disabled = annotationVertices.length < 3;
+    }
+
+    function renderAnnotationList() {
+        const list = document.getElementById('annotation-list');
+        list.innerHTML = '';
+        annotations.forEach(a => {
+            const item = document.createElement('div');
+            item.className = 'annotation-item';
+
+            const swatch = document.createElement('span');
+            swatch.className = 'annotation-swatch';
+            swatch.style.background = a.color;
+
+            const labelEl = document.createElement('span');
+            labelEl.className = 'annotation-item-label';
+            labelEl.title = a.label;
+            labelEl.textContent = `${a.kind === 'point' ? '📍' : '▱'} ${a.label}`;
+            labelEl.addEventListener('click', () => {
+                const bbox = turf.bbox(a.geometry);
+                map.fitBounds(bbox, { padding: 100, maxZoom: 16, duration: 600 });
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'annotation-delete-btn';
+            deleteBtn.setAttribute('aria-label', 'Delete');
+            deleteBtn.textContent = '✕';
+            deleteBtn.addEventListener('click', () => {
+                annotations = annotations.filter(x => x.id !== a.id);
+                renderAnnotations();
+                renderAnnotationList();
+                setAnnotationStatus(annotations.length ? `${annotations.length} annotation(s) on map` : 'Click a button above to start');
+            });
+
+            item.append(swatch, labelEl, deleteBtn);
+            list.appendChild(item);
+        });
+    }
+
+    function setAnnotationStatus(text) {
+        document.getElementById('annotation-status').textContent = text;
+        document.getElementById('draw-toolbar-hint').textContent = text;
+    }
+
+    function cancelAnnotationDraft() {
+        annotationVertices = [];
+        renderAnnotationDraft();
+    }
+
+    function setAnnotationMode(mode) {
+        cancelAnnotationDraft();
+        annotationMode = (annotationMode === mode) ? null : mode;
+
+        document.getElementById('add-point-btn').classList.toggle('active', annotationMode === 'point');
+        document.getElementById('add-polygon-btn').classList.toggle('active', annotationMode === 'polygon');
+        map.getCanvas().style.cursor = annotationMode ? 'crosshair' : '';
+        map.doubleClickZoom[annotationMode === 'polygon' ? 'disable' : 'enable']();
+
+        // On mobile the Tools drawer covers the map - close it once a draw mode starts
+        // so there's something visible to tap/draw on.
+        if (annotationMode) {
+            document.getElementById('tools-panel').classList.remove('open');
+            document.getElementById('layer-panel').classList.remove('open');
+            document.getElementById('panel-backdrop').classList.remove('open');
+        }
+
+        const toolbar = document.getElementById('draw-toolbar');
+        const finishBtn = document.getElementById('finish-polygon-btn');
+        toolbar.classList.toggle('visible', !!annotationMode);
+        finishBtn.style.display = annotationMode === 'polygon' ? '' : 'none';
+        finishBtn.disabled = true;
+
+        if (annotationMode === 'point') {
+            setAnnotationStatus('Tap the map to place a point');
+        } else if (annotationMode === 'polygon') {
+            setAnnotationStatus('Tap to add corners, then Finish');
+        } else {
+            setAnnotationStatus(annotations.length ? `${annotations.length} annotation(s) on map` : 'Click a button above to start');
+        }
+    }
+
+    function openAnnotationLabelPopup(lngLat, kind, color, geometry) {
+        annotationPopupOpen = true;
+
+        const container = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'annotation-label-title';
+        title.textContent = `Label this ${kind}`;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'e.g. Plot A - regrowth site';
+        input.maxLength = 80;
+
+        const actions = document.createElement('div');
+        actions.className = 'annotation-label-actions';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'annotation-label-cancel';
+        cancelBtn.textContent = 'Cancel';
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'annotation-label-save';
+        saveBtn.textContent = 'Save';
+        actions.append(cancelBtn, saveBtn);
+        container.append(title, input, actions);
+
+        const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'annotation-label-popup' })
+            .setLngLat(lngLat)
+            .setDOMContent(container)
+            .addTo(map);
+        currentAnnotationPopup = popup;
+
+        function finish() {
+            annotationPopupOpen = false;
+            currentAnnotationPopup = null;
+            popup.remove();
+            setAnnotationMode(null);
+        }
+
+        saveBtn.addEventListener('click', () => {
+            const label = input.value.trim();
+            if (!label) { input.focus(); return; }
+            annotations.push({ id: ++annotationIdCounter, kind, label, color, geometry });
+            renderAnnotations();
+            renderAnnotationList();
+            finish();
+        });
+        cancelBtn.addEventListener('click', finish);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') saveBtn.click();
+            if (e.key === 'Escape') finish();
+        });
+        input.focus();
+    }
+
+    function finishAnnotationPolygon() {
+        if (annotationVertices.length < 3) {
+            cancelAnnotationDraft();
+            setAnnotationStatus('A polygon needs at least 3 points - click to add corners');
+            return;
+        }
+        const ring = [...annotationVertices, annotationVertices[0]];
+        const geometry = { type: 'Polygon', coordinates: [ring] };
+        const color = document.getElementById('annotation-color').value;
+        const center = turf.centerOfMass({ type: 'Feature', properties: {}, geometry }).geometry.coordinates;
+        cancelAnnotationDraft();
+        openAnnotationLabelPopup(center, 'polygon', color, geometry);
+    }
+
+    map.on('click', (e) => {
+        if (annotationPopupOpen) return;
+        if (annotationMode === 'point') {
+            const color = document.getElementById('annotation-color').value;
+            const geometry = { type: 'Point', coordinates: [e.lngLat.lng, e.lngLat.lat] };
+            openAnnotationLabelPopup(e.lngLat, 'point', color, geometry);
+        } else if (annotationMode === 'polygon') {
+            annotationVertices.push([e.lngLat.lng, e.lngLat.lat]);
+            renderAnnotationDraft();
+        }
+    });
+
+    map.on('dblclick', (e) => {
+        if (annotationMode !== 'polygon' || annotationPopupOpen) return;
+        e.preventDefault();
+        // A dblclick is preceded by two click events, which already pushed the same
+        // point twice onto annotationVertices - drop that duplicate before closing the ring.
+        if (annotationVertices.length >= 2) annotationVertices.pop();
+        finishAnnotationPolygon();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (!annotationMode || annotationPopupOpen) return;
+        if (e.key === 'Enter' && annotationMode === 'polygon') finishAnnotationPolygon();
+        if (e.key === 'Escape') setAnnotationMode(null);
+    });
+
+    document.getElementById('add-point-btn').addEventListener('click', () => setAnnotationMode('point'));
+    document.getElementById('add-polygon-btn').addEventListener('click', () => setAnnotationMode('polygon'));
+    document.getElementById('finish-polygon-btn').addEventListener('click', finishAnnotationPolygon);
+    document.getElementById('cancel-draw-btn').addEventListener('click', () => setAnnotationMode(null));
+    document.getElementById('clear-annotations-btn').addEventListener('click', () => {
+        annotations = [];
+        renderAnnotations();
+        renderAnnotationList();
+        setAnnotationStatus('Click a button above to start');
+    });
 
     // ==================== AOI-CLIPPED LEGEND RANGES ====================
     // The legend's numbers are the original full-dataset range, baked into this
@@ -2409,6 +2955,14 @@
     };
 
     async function exportMap() {
+        // Don't let a half-drawn polygon or an open label popup end up in the export.
+        if (currentAnnotationPopup) {
+            currentAnnotationPopup.remove();
+            currentAnnotationPopup = null;
+            annotationPopupOpen = false;
+        }
+        setAnnotationMode(null);
+
         const btn = document.getElementById('export-map-btn');
         const originalBtnText = btn.textContent;
         btn.textContent = 'Exporting…';
