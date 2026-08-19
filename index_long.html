@@ -98,6 +98,52 @@
             font-weight: 600;
         }
 
+        .panel-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .panel-collapse-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 6px;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .panel-collapse-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        /* Collapsed panel: header stays, body content and the extra bottom padding
+           it needs both disappear, so the panel shrinks down to just the title bar. */
+        .layer-panel.panel-collapsed {
+            min-width: 0;
+            width: auto;
+            padding-bottom: 8px;
+            max-height: none;
+        }
+
+        .layer-panel.panel-collapsed .panel-header {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .layer-panel.panel-collapsed .layer-panel-body {
+            display: none;
+        }
+
+        .layer-panel.panel-collapsed .panel-collapse-btn {
+            transform: rotate(-90deg);
+        }
+
         .layer-group {
             margin-bottom: 20px;
         }
@@ -473,6 +519,12 @@
                 line-height: 1;
                 cursor: pointer;
                 padding: 4px 6px;
+            }
+
+            /* The collapse toggle is a desktop-space-saving feature - on mobile the
+               drawer's own open/close already handles that, so hide it there. */
+            .panel-collapse-btn {
+                display: none;
             }
 
             /* Dimmed backdrop behind an open drawer */
@@ -1164,8 +1216,13 @@
 <div class="layer-panel" id="layer-panel">
     <div class="panel-header">
         <h2>🗂️ Layers</h2>
-        <button class="panel-close-btn" id="layer-close-btn" aria-label="Close layers">✕</button>
+        <div class="panel-header-actions">
+            <button class="panel-collapse-btn" id="layer-collapse-btn" aria-label="Collapse layers panel" title="Collapse">▾</button>
+            <button class="panel-close-btn" id="layer-close-btn" aria-label="Close layers">✕</button>
+        </div>
     </div>
+
+    <div class="layer-panel-body" id="layer-panel-body">
 
     <!-- Base Maps -->
     <div class="layer-group" id="base-map-group">
@@ -1594,6 +1651,7 @@
         </div>
     </div>
 
+    </div>
 </div>
 
 <!-- Coordinates Display -->
@@ -1993,6 +2051,27 @@
         document.getElementById('tools-close-btn').addEventListener('click', closeDrawers);
         document.getElementById('layer-close-btn').addEventListener('click', closeDrawers);
         backdrop.addEventListener('click', closeDrawers);
+    })();
+
+    // ==================== LAYERS PANEL COLLAPSE (desktop space-saver) ====================
+
+    (function setupLayerPanelCollapse() {
+        const layerPanel = document.getElementById('layer-panel');
+        const collapseBtn = document.getElementById('layer-collapse-btn');
+        const STORAGE_KEY = 'wt-layer-panel-collapsed';
+
+        function setCollapsed(collapsed) {
+            layerPanel.classList.toggle('panel-collapsed', collapsed);
+            collapseBtn.setAttribute('aria-label', collapsed ? 'Expand layers panel' : 'Collapse layers panel');
+            collapseBtn.title = collapsed ? 'Expand' : 'Collapse';
+            localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+        }
+
+        collapseBtn.addEventListener('click', () => {
+            setCollapsed(!layerPanel.classList.contains('panel-collapsed'));
+        });
+
+        setCollapsed(localStorage.getItem(STORAGE_KEY) === '1');
     })();
 
     // ==================== LEGEND TOGGLE FUNCTION ====================
