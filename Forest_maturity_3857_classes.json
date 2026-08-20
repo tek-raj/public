@@ -1,12 +1,52 @@
 [
-  {"value": 3, "color": "#d9f99d", "label": "Class 3"},
-  {"value": 4, "color": "#c3e791", "label": "Class 4"},
-  {"value": 5, "color": "#add484", "label": "Class 5"},
-  {"value": 6, "color": "#97c278", "label": "Class 6"},
-  {"value": 7, "color": "#81af6b", "label": "Class 7"},
-  {"value": 8, "color": "#6c9d5f", "label": "Class 8"},
-  {"value": 9, "color": "#568a52", "label": "Class 9"},
-  {"value": 10, "color": "#407846", "label": "Class 10"},
-  {"value": 11, "color": "#2a6539", "label": "Class 11"},
-  {"value": 12, "color": "#14532d", "label": "Class 12"}
+  {
+    "value": 3,
+    "color": "#fbcfe8",
+    "label": "Class 3"
+  },
+  {
+    "value": 4,
+    "color": "#f472b6",
+    "label": "Class 4"
+  },
+  {
+    "value": 5,
+    "color": "#be185d",
+    "label": "Class 5"
+  },
+  {
+    "value": 6,
+    "color": "#dcfce7",
+    "label": "Class 6"
+  },
+  {
+    "value": 7,
+    "color": "#bbf7d0",
+    "label": "Class 7"
+  },
+  {
+    "value": 8,
+    "color": "#86efac",
+    "label": "Class 8"
+  },
+  {
+    "value": 9,
+    "color": "#4ade80",
+    "label": "Class 9"
+  },
+  {
+    "value": 10,
+    "color": "#22c55e",
+    "label": "Class 10"
+  },
+  {
+    "value": 11,
+    "color": "#15803d",
+    "label": "Class 11"
+  },
+  {
+    "value": 12,
+    "color": "#14532d",
+    "label": "Class 12"
+  }
 ]
