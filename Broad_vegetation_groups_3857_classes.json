@@ -35,11 +35,6 @@
     "label": "Eucalypt dry woodlands on inland depositional plains"
   },
   {
-    "value": 8,
-    "color": "#3d6b4f",
-    "label": "Rainforests and scrubs (unclassified)"
-  },
-  {
     "value": 9,
     "color": "#ffffbf",
     "label": "Tussock grasslands, forblands"
@@ -66,7 +61,7 @@
   },
   {
     "value": 14,
-    "color": "#13E815",
+    "color": "#5C4033",
     "label": "Wet eucalypt open forests"
   },
   {
@@ -86,7 +81,7 @@
   },
   {
     "value": 18,
-    "color": "#454B1B",
+    "color": "#13E815",
     "label": "Rainforests and scrubs - Microphyll"
   }
 ]
