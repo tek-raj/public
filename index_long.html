@@ -15,6 +15,8 @@
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <!-- html2canvas: snapshots the map + overlays (legend, title, north arrow, scale bar) to PNG -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- PapaParse: robust CSV parsing (quoted fields, embedded commas, etc.) for the species-data upload -->
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -992,6 +994,81 @@
             color: rgba(255, 255, 255, 0.8);
         }
 
+        /* Species data (CSV) upload */
+        .csv-dropzone {
+            border: 2px dashed rgba(255, 255, 255, 0.25);
+            border-radius: 10px;
+            padding: 16px 12px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            cursor: pointer;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .csv-dropzone:hover,
+        .csv-dropzone.dragover {
+            border-color: #4f9cf7;
+            background: rgba(79, 156, 247, 0.08);
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .csv-mapping {
+            margin-top: 10px;
+        }
+
+        .tools-panel select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        .tools-panel select option {
+            background: #1e2749;
+            color: #ffffff;
+        }
+
+        /* Popup listing a species point's full CSV row - reuses the annotation
+           popup's dark-glass look for visual consistency. */
+        .maplibregl-popup.species-popup .maplibregl-popup-content {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 12px 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            max-width: 260px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .maplibregl-popup.species-popup .maplibregl-popup-tip {
+            border-top-color: rgba(15, 23, 42, 0.95);
+            border-bottom-color: rgba(15, 23, 42, 0.95);
+        }
+
+        .species-popup-row {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.85);
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .species-popup-row:last-child {
+            border-bottom: none;
+        }
+
+        .species-popup-row b {
+            color: rgba(255, 255, 255, 0.55);
+            font-weight: 600;
+            margin-right: 4px;
+        }
+
         /* North arrow (shown only while exporting). Has its own opaque badge
            background - the map underneath can be light or dark at any corner,
            so the arrow can't rely on the basemap for contrast. */
@@ -1163,6 +1240,36 @@
         <div class="annotation-list" id="annotation-list"></div>
 
         <button class="tools-btn tools-btn-secondary" id="clear-annotations-btn">Clear All Annotations</button>
+    </div>
+
+    <div class="tools-section">
+        <div class="tools-section-title">Species Data (CSV)</div>
+
+        <div class="csv-dropzone" id="csv-dropzone">
+            <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display: none;">
+            <span id="csv-dropzone-text">Drag &amp; drop a CSV here, or click to browse</span>
+        </div>
+
+        <div class="csv-mapping" id="csv-mapping" style="display: none;">
+            <label class="tools-field-label" for="csv-lat-col">Latitude column</label>
+            <select id="csv-lat-col"></select>
+
+            <label class="tools-field-label" for="csv-lon-col" style="margin-top: 8px;">Longitude column</label>
+            <select id="csv-lon-col"></select>
+
+            <label class="tools-field-label" for="csv-label-col" style="margin-top: 8px;">Label column (optional)</label>
+            <select id="csv-label-col"></select>
+
+            <div class="tools-inline-row">
+                <label class="tools-field-label" for="csv-point-color" style="margin-bottom: 0;">Point colour</label>
+                <input type="color" id="csv-point-color" value="#ff6b00">
+            </div>
+
+            <button class="tools-btn tools-btn-primary" id="csv-plot-btn">Plot Points</button>
+        </div>
+
+        <div class="aoi-status" id="csv-status">No CSV loaded this session - drop one above to plot it</div>
+        <button class="tools-btn tools-btn-secondary" id="csv-clear-btn" style="display: none;">Clear Points</button>
     </div>
 
     <div class="tools-section">
@@ -2625,6 +2732,211 @@
         setAnnotationStatus('Click a button above to start');
     });
 
+    // ==================== SPECIES DATA (CSV upload, session-only) ====================
+    // Drag-and-drop or browse a CSV of point records, pick which columns hold
+    // latitude/longitude, and plot them as a map layer. This is a static site with
+    // no backend, so nothing is saved anywhere - the data lives only in this
+    // browser tab and is gone on refresh unless the file is dropped in again.
+
+    let csvRows = null;
+    let csvHeaders = [];
+    let currentSpeciesPopup = null;
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        }[c]));
+    }
+
+    function guessColumn(headers, patterns) {
+        for (const h of headers) {
+            if (patterns.includes(h.toLowerCase())) return h;
+        }
+        for (const h of headers) {
+            const lower = h.toLowerCase();
+            if (patterns.some((p) => lower.includes(p))) return h;
+        }
+        return headers[0] || '';
+    }
+
+    function populateCsvSelects() {
+        const latSel = document.getElementById('csv-lat-col');
+        const lonSel = document.getElementById('csv-lon-col');
+        const labelSel = document.getElementById('csv-label-col');
+        const optionsHtml = csvHeaders.map((h) => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+
+        latSel.innerHTML = optionsHtml;
+        lonSel.innerHTML = optionsHtml;
+        labelSel.innerHTML = '<option value="">(none)</option>' + optionsHtml;
+
+        latSel.value = guessColumn(csvHeaders, ['latitude', 'lat', 'y']);
+        lonSel.value = guessColumn(csvHeaders, ['longitude', 'lon', 'lng', 'long', 'x']);
+        const labelGuess = guessColumn(csvHeaders, ['species', 'name', 'label']);
+        labelSel.value = csvHeaders.includes(labelGuess) ? labelGuess : '';
+    }
+
+    function handleCsvFile(file) {
+        if (!file) return;
+        const statusEl = document.getElementById('csv-status');
+        statusEl.textContent = `Parsing ${file.name}...`;
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                csvRows = results.data;
+                csvHeaders = results.meta.fields || [];
+                if (csvHeaders.length === 0 || csvRows.length === 0) {
+                    statusEl.textContent = 'That file had no readable rows.';
+                    return;
+                }
+                populateCsvSelects();
+                document.getElementById('csv-mapping').style.display = '';
+                document.getElementById('csv-dropzone-text').textContent = `${file.name} (${csvRows.length} rows) - check columns below`;
+                statusEl.textContent = 'Choose the latitude/longitude columns, then Plot Points';
+            },
+            error: (err) => {
+                statusEl.textContent = `Could not parse that CSV: ${err.message}`;
+            },
+        });
+    }
+
+    function plotCsvPoints() {
+        if (!csvRows) return;
+        const latCol = document.getElementById('csv-lat-col').value;
+        const lonCol = document.getElementById('csv-lon-col').value;
+        const labelCol = document.getElementById('csv-label-col').value;
+        const color = document.getElementById('csv-point-color').value;
+        const statusEl = document.getElementById('csv-status');
+
+        const features = [];
+        let skipped = 0;
+        csvRows.forEach((row) => {
+            const lat = parseFloat(row[latCol]);
+            const lon = parseFloat(row[lonCol]);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                skipped++;
+                return;
+            }
+            features.push({
+                type: 'Feature',
+                properties: { ...row, __label: labelCol ? String(row[labelCol] ?? '') : '' },
+                geometry: { type: 'Point', coordinates: [lon, lat] },
+            });
+        });
+
+        if (features.length === 0) {
+            statusEl.textContent = 'No valid coordinates found with those columns - check your column choices.';
+            return;
+        }
+
+        const fc = { type: 'FeatureCollection', features };
+
+        if (map.getSource('speciesData')) {
+            map.getSource('speciesData').setData(fc);
+            map.setPaintProperty('species-points', 'circle-color', color);
+        } else {
+            map.addSource('speciesData', { type: 'geojson', data: fc });
+            map.addLayer({
+                id: 'species-points',
+                type: 'circle',
+                source: 'speciesData',
+                paint: {
+                    'circle-radius': 5,
+                    'circle-color': color,
+                    'circle-stroke-color': '#ffffff',
+                    'circle-stroke-width': 1.5,
+                },
+            });
+            map.addLayer({
+                id: 'species-labels',
+                type: 'symbol',
+                source: 'speciesData',
+                filter: ['!=', ['get', '__label'], ''],
+                layout: {
+                    'text-field': ['get', '__label'],
+                    'text-size': 11,
+                    'text-font': ['Open Sans Bold'],
+                    'text-offset': [0, 1.2],
+                    'text-anchor': 'top',
+                    'text-allow-overlap': false,
+                },
+                paint: {
+                    'text-color': '#ffffff',
+                    'text-halo-color': 'rgba(0, 0, 0, 0.85)',
+                    'text-halo-width': 1.2,
+                },
+            });
+
+            map.on('click', 'species-points', (e) => {
+                if (currentSpeciesPopup) currentSpeciesPopup.remove();
+                const props = e.features[0].properties;
+                const rows = Object.keys(props)
+                    .filter((k) => k !== '__label')
+                    .map((k) => `<div class="species-popup-row"><b>${escapeHtml(k)}:</b> ${escapeHtml(props[k])}</div>`)
+                    .join('');
+                currentSpeciesPopup = new maplibregl.Popup({ className: 'species-popup', maxWidth: '280px' })
+                    .setLngLat(e.features[0].geometry.coordinates)
+                    .setHTML(rows)
+                    .addTo(map);
+            });
+            map.on('mouseenter', 'species-points', () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', 'species-points', () => { map.getCanvas().style.cursor = annotationMode ? 'crosshair' : ''; });
+        }
+
+        document.getElementById('csv-clear-btn').style.display = '';
+        statusEl.textContent = `${features.length} point(s) plotted` +
+            (skipped ? `, ${skipped} row(s) skipped (invalid coordinates)` : '');
+
+        map.fitBounds(turf.bbox(fc), { padding: 80, maxZoom: 14, duration: 800 });
+    }
+
+    function clearCsvPoints() {
+        ['species-points', 'species-labels'].forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
+        if (map.getSource('speciesData')) map.removeSource('speciesData');
+        csvRows = null;
+        csvHeaders = [];
+        document.getElementById('csv-mapping').style.display = 'none';
+        document.getElementById('csv-dropzone-text').textContent = 'Drag & drop a CSV here, or click to browse';
+        document.getElementById('csv-status').textContent = 'No CSV loaded this session - drop one above to plot it';
+        document.getElementById('csv-clear-btn').style.display = 'none';
+        document.getElementById('csv-file-input').value = '';
+    }
+
+    (function setupCsvUpload() {
+        // Prevent an accidental drop outside the dropzone from navigating the
+        // whole page away to the dropped file.
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('drop', (e) => e.preventDefault());
+
+        const dropzone = document.getElementById('csv-dropzone');
+        const fileInput = document.getElementById('csv-file-input');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleCsvFile(e.target.files[0]));
+
+        ['dragenter', 'dragover'].forEach((evt) => {
+            dropzone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('dragover');
+            });
+        });
+        ['dragleave', 'drop'].forEach((evt) => {
+            dropzone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('dragover');
+            });
+        });
+        dropzone.addEventListener('drop', (e) => {
+            const file = e.dataTransfer.files && e.dataTransfer.files[0];
+            handleCsvFile(file);
+        });
+
+        document.getElementById('csv-plot-btn').addEventListener('click', plotCsvPoints);
+        document.getElementById('csv-clear-btn').addEventListener('click', clearCsvPoints);
+    })();
+
     // ==================== AOI-CLIPPED LEGEND RANGES ====================
     // The legend's numbers are the original full-dataset range, baked into this
     // page's HTML when the tiles were generated. This reads the small underlying
@@ -3051,11 +3363,15 @@
     };
 
     async function exportMap() {
-        // Don't let a half-drawn polygon or an open label popup end up in the export.
+        // Don't let a half-drawn polygon or an open label/species popup end up in the export.
         if (currentAnnotationPopup) {
             currentAnnotationPopup.remove();
             currentAnnotationPopup = null;
             annotationPopupOpen = false;
+        }
+        if (currentSpeciesPopup) {
+            currentSpeciesPopup.remove();
+            currentSpeciesPopup = null;
         }
         setAnnotationMode(null);
 
