@@ -754,12 +754,43 @@
         }
 
         .tools-section-title {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 11px;
-            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 13px;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .tools-section-chevron {
+            flex-shrink: 0;
+            color: rgba(255, 255, 255, 0.5);
+            transition: transform 0.25s ease;
+        }
+
+        .tools-section.collapsed .tools-section-title {
+            margin-bottom: 0;
+        }
+
+        .tools-section.collapsed .tools-section-chevron {
+            transform: rotate(-90deg);
+        }
+
+        .tools-section-body {
+            overflow: hidden;
+            max-height: 2000px;
+            opacity: 1;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+        }
+
+        .tools-section.collapsed .tools-section-body {
+            max-height: 0;
+            opacity: 0;
         }
 
         .tools-field-label {
@@ -1202,8 +1233,12 @@
         <button class="panel-close-btn" id="tools-close-btn" aria-label="Close map tools">✕</button>
     </div>
 
-    <div class="tools-section">
-        <div class="tools-section-title">Area of Interest</div>
+    <div class="tools-section collapsed">
+        <div class="tools-section-title">
+            <span>Area of Interest</span>
+            <svg class="tools-section-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
+        <div class="tools-section-body">
         <label class="tools-field-label" for="aoi-file-input">Upload boundary (GeoJSON)</label>
         <input type="file" id="aoi-file-input" accept=".geojson,.json,application/geo+json,application/json">
 
@@ -1220,11 +1255,15 @@
 
         <div class="aoi-status" id="aoi-status">No AOI loaded — full extent shown</div>
         <button class="tools-btn tools-btn-secondary" id="aoi-clear-btn">Clear AOI</button>
+        </div>
     </div>
 
-    <div class="tools-section">
-        <div class="tools-section-title">Annotations</div>
-
+    <div class="tools-section collapsed">
+        <div class="tools-section-title">
+            <span>Point / Area Annotations</span>
+            <svg class="tools-section-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
+        <div class="tools-section-body">
         <div class="tools-inline-row" style="margin-top: 0;">
             <label class="tools-field-label" for="annotation-color" style="margin-bottom: 0;">Colour</label>
             <input type="color" id="annotation-color" value="#ff3b30">
@@ -1240,11 +1279,15 @@
         <div class="annotation-list" id="annotation-list"></div>
 
         <button class="tools-btn tools-btn-secondary" id="clear-annotations-btn">Clear All Annotations</button>
+        </div>
     </div>
 
-    <div class="tools-section">
-        <div class="tools-section-title">Species Data (CSV)</div>
-
+    <div class="tools-section collapsed">
+        <div class="tools-section-title">
+            <span>Species Data (CSV)</span>
+            <svg class="tools-section-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
+        <div class="tools-section-body">
         <div class="csv-dropzone" id="csv-dropzone">
             <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display: none;">
             <span id="csv-dropzone-text">Drag &amp; drop a CSV here, or click to browse</span>
@@ -1282,10 +1325,15 @@
 
         <div class="aoi-status" id="csv-status">No CSV loaded this session - drop one above to plot it</div>
         <button class="tools-btn tools-btn-secondary" id="csv-clear-btn" style="display: none;">Clear Points</button>
+        </div>
     </div>
 
-    <div class="tools-section">
-        <div class="tools-section-title">Export Map</div>
+    <div class="tools-section collapsed">
+        <div class="tools-section-title">
+            <span>Export Map</span>
+            <svg class="tools-section-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
+        <div class="tools-section-body">
         <label class="tools-field-label" for="export-title-input">Map title (optional)</label>
         <input type="text" id="export-title-input" placeholder="e.g. Cyclone Wind Speed - Wet Tropics">
 
@@ -1310,6 +1358,7 @@
         </select>
 
         <button class="tools-btn tools-btn-primary" id="export-map-btn">📷 Export as PNG</button>
+        </div>
     </div>
 </div>
 
@@ -2231,6 +2280,16 @@
 
         setCollapsed(localStorage.getItem(STORAGE_KEY) === '1');
     })();
+
+    // ==================== TOOLS PANEL SECTION COLLAPSE ====================
+    // Area of Interest / Annotations / Species Data / Export Map each start
+    // collapsed so the panel isn't a wall of controls - click a heading to
+    // expand just that section and work in it.
+    document.querySelectorAll('.tools-section-title').forEach((title) => {
+        title.addEventListener('click', () => {
+            title.closest('.tools-section').classList.toggle('collapsed');
+        });
+    });
 
     // ==================== LEGEND TOGGLE FUNCTION ====================
     
