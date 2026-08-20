@@ -1,0 +1,3 @@
+# User-supplied species data - stays local, never committed
+csv/*.csv
+!csv/README.txt
